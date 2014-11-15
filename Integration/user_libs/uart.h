@@ -2,7 +2,7 @@
  * uart.h
  *
  *  Created on: Nov 5, 2014
- *      Author: Luis de la Vega, Juan Miranda
+ *      Author: Luis de la Vega, Juan Miranda, Daniel Navarro, Rafael Pol
  */
 
 #ifndef UART_H_

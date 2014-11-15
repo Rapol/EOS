@@ -2,7 +2,7 @@
  * adc.c
  *
  *  Created on: Nov 5, 2014
- *      Author: Luis de la Vega
+ *      Author: Luis de la Vega, Juan Miranda, Daniel Navarro, Rafael Pol
  */
 
 #include <stdio.h>
@@ -30,8 +30,8 @@
 uint32_t result_sample[8], result_ref[8];
 
 void ADC_Init(void) {
-	SysCtlClockSet(
-	SYSCTL_SYSDIV_5 | SYSCTL_USE_PLL | SYSCTL_OSC_MAIN | SYSCTL_XTAL_16MHZ);
+//	SysCtlClockSet(
+//	SYSCTL_SYSDIV_5 | SYSCTL_USE_PLL | SYSCTL_OSC_MAIN | SYSCTL_XTAL_16MHZ);
 
 	SysCtlPeripheralEnable(SYSCTL_PERIPH_ADC0);	// PE3
 //	ADCHardwareOversampleConfigure(ADC0_BASE, 64);
@@ -71,7 +71,7 @@ void ADC_Init(void) {
 // Output: 8-bit result of ADC conversion
 float ADC_VoltageDifference(float *voltage_sample, float *voltage_ref) {
 
-	ADCIntClear(ADC0_BASE, 0);
+//	ADCIntClear(ADC0_BASE, 0);
 	ADCProcessorTrigger(ADC0_BASE, 0);
 
 	while (!ADCIntStatus(ADC0_BASE, 0, false))
@@ -79,7 +79,7 @@ float ADC_VoltageDifference(float *voltage_sample, float *voltage_ref) {
 
 	ADCSequenceDataGet(ADC0_BASE, 0, result_sample);
 
-	ADCIntClear(ADC1_BASE, 0);
+//	ADCIntClear(ADC1_BASE, 0);
 	ADCProcessorTrigger(ADC1_BASE, 0);
 
 	while (!ADCIntStatus(ADC1_BASE, 0, false))

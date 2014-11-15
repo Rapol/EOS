@@ -2,7 +2,7 @@
  * adc.h
  *
  *  Created on: Nov 5, 2014
- *      Author: Luis de la Vega
+ *      Author: Luis de la Vega, Juan Miranda, Daniel Navarro, Rafael Pol
  */
 
 #ifndef ADC_H_

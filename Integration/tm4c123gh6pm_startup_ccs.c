@@ -56,6 +56,7 @@ extern uint32_t __STACK_TOP;
 //*****************************************************************************
 // To be added by user
 extern void Timer0IntHandler(void);
+extern void GPIOPortAHandler(void);
 
 //*****************************************************************************
 //
@@ -84,7 +85,7 @@ void (* const g_pfnVectors[])(void) =
     0,                                      // Reserved
     IntDefaultHandler,                      // The PendSV handler
     IntDefaultHandler,                      // The SysTick handler
-    IntDefaultHandler,                      // GPIO Port A
+    GPIOPortAHandler,                      // GPIO Port A
     IntDefaultHandler,                      // GPIO Port B
     IntDefaultHandler,                      // GPIO Port C
     IntDefaultHandler,                      // GPIO Port D

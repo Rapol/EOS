@@ -2,7 +2,7 @@
  * spi.c
  *
  *  Created on: Nov 5, 2014
- *      Author: Luis de la Vega, Daniel Navarro
+ *      Author: Luis de la Vega, Juan Miranda, Daniel Navarro, Rafael Pol
  */
 
 #include <stdio.h>

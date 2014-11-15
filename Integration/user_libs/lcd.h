@@ -2,7 +2,7 @@
  * lcd.h
  *
  *  Created on: Nov 5, 2014
- *      Author: Luis de la Vega
+ *      Author: Luis de la Vega, Juan Miranda, Daniel Navarro, Rafael Pol
  */
 
 #ifndef LCD_H_
@@ -17,14 +17,22 @@
 // PA6 => RS
 // PA7 => E
 
-#define FIRST_LINE	0x00
-#define SECOND_LINE	0x40
+//#define FIRST_LINE	0x00
+//#define SECOND_LINE	0x40
+//#define CLKSPEED	40000000
+#define LCD_DATA_PORT	GPIO_PORTC_BASE
+#define LCD_COMMAND_PORT	GPIO_PORTA_BASE
+#define RS	GPIO_PIN_6
+#define E	GPIO_PIN_7
+#define D4	GPIO_PIN_4
+#define D5	GPIO_PIN_5
+#define D6	GPIO_PIN_6
+#define D7	GPIO_PIN_7
 #define CLKSPEED	40000000
 
-extern void LCD_ToggleEnable(void);
-extern void LCD_MoveCursor(int displayLine);
-extern void LCD_ClearScreen(void);
 extern void LCD_Init(void);
-extern void LCD_SendChars(char *init);
+extern void LCD_Command(unsigned char command);
+extern void LCD_Write(unsigned char inputData);
+extern void LCD_WriteText(char* inputText, unsigned char row, unsigned char col);
 
 #endif /* LCD_H_ */

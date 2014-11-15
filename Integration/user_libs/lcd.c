@@ -2,7 +2,7 @@
  * lcd.c
  *
  *  Created on: Nov 5, 2014
- *      Author: Luis de la Vega
+ *      Author: Luis de la Vega, Juan Miranda, Daniel Navarro, Rafael Pol
  */
 
 #include <stdio.h>
@@ -30,111 +30,113 @@
 // PA6 => RS
 // PA7 => E
 
-// Enable toggle to send data
-void LCD_ToggleEnable(void) {
-	GPIO_PORTA_DATA_R ^= 0x80;
+void LCD_Write(unsigned char inputData) {
+
+	GPIOPinWrite(LCD_DATA_PORT, D4 | D5 | D6 | D7, (inputData & 0xf0));
+	GPIOPinWrite(LCD_COMMAND_PORT, RS, RS);
+	GPIOPinWrite(LCD_COMMAND_PORT, E, E);
 	SysCtlDelay((20e-6) * CLKSPEED / 3);
-	GPIO_PORTA_DATA_R ^= 0x80;
-	//Wait time > 41ms
-	SysCtlDelay((50e-3) * CLKSPEED / 3);
+	GPIOPinWrite(LCD_COMMAND_PORT, E, 0x00);
+
+	SysCtlDelay((100e-6) * CLKSPEED / 3);
+
+	GPIOPinWrite(LCD_DATA_PORT, D4 | D5 | D6 | D7, (inputData & 0x0f) << 4);
+	GPIOPinWrite(LCD_COMMAND_PORT, RS, RS);
+	GPIOPinWrite(LCD_COMMAND_PORT, E, E);
+	SysCtlDelay((20e-6) * CLKSPEED / 3);
+	GPIOPinWrite(LCD_COMMAND_PORT, E, 0x00);
+
+	SysCtlDelay((5e-3) * CLKSPEED / 3);
+
 }
 
-void LCD_MoveCursor(int displayLine) {
-	// Setting obligatory one
-	displayLine |= 0x80;
-	// RS clear
-	GPIO_PORTA_DATA_R &= ~0x40;
-	// Set address
-	GPIO_PORTC_DATA_R = displayLine;
-	LCD_ToggleEnable();
-	GPIO_PORTC_DATA_R = displayLine << 4;
-	LCD_ToggleEnable();
+void LCD_WriteText(char* inputText, unsigned char row, unsigned char col) {
+	unsigned char address_d = 0;		// address of the data in the screen.
+	switch (row) {
+	case 0:
+		address_d = 0x80 + col;		// at zeroth row
+		break;
+	case 1:
+		address_d = 0xC0 + col;		// at first row
+		break;
+	case 2:
+		address_d = 0x94 + col;		// at second row
+		break;
+	case 3:
+		address_d = 0xD4 + col;		// at third row
+		break;
+	default:
+		address_d = 0x80 + col;	// returns to first row if invalid row number is detected
+		break;
+	}
+
+	LCD_Command(address_d);
+
+	while (*inputText)					// Place a string, letter by letter.
+		LCD_Write(*inputText++);
 }
 
-// Clear screen and reset cursor to the first line
-void LCD_ClearScreen(void) {
-	// Clear RS
-	GPIO_PORTA_DATA_R &= ~0x40;
-	// Clear display        0 0 | 0 0 0 0 0 0 0 1
-	GPIO_PORTC_DATA_R = 0x00;
-	LCD_ToggleEnable();
-	GPIO_PORTC_DATA_R = 0x10;
-	LCD_ToggleEnable();
+void LCD_Command(unsigned char command) {
 
-	// Move Cursor to first line
-	LCD_MoveCursor(FIRST_LINE);
+	GPIOPinWrite(LCD_DATA_PORT, D4 | D5 | D6 | D7, (command & 0xf0));
+	GPIOPinWrite(LCD_COMMAND_PORT, RS, 0x00);
+	GPIOPinWrite(LCD_COMMAND_PORT, E, E);
+	SysCtlDelay((20e-6) * CLKSPEED / 3);
+	GPIOPinWrite(LCD_COMMAND_PORT, E, 0x00);
+
+	SysCtlDelay((100e-6) * CLKSPEED / 3);
+
+	GPIOPinWrite(LCD_DATA_PORT, D4 | D5 | D6 | D7, (command & 0x0f) << 4);
+	GPIOPinWrite(LCD_COMMAND_PORT, RS, 0x00);
+	GPIOPinWrite(LCD_COMMAND_PORT, E, E);
+	SysCtlDelay((20e-6) * CLKSPEED / 3);
+	GPIOPinWrite(LCD_COMMAND_PORT, E, 0x00);
+
+	SysCtlDelay((5e-3) * CLKSPEED / 3);
+
 }
 
 void LCD_Init(void) {
 	SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOA);
 	SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOC);
 
-	// Initializing PortA
-	GPIO_PORTA_CR_R = 0xC0;                 // allow changes to PA6 and PA7
-	GPIO_PORTA_PCTL_R &= ~0xFF000000;       // GPIO clear bit PCTL
-	GPIO_PORTA_DIR_R |= 0xC0;               // PA6 and PA7 outputs
-	GPIO_PORTA_AFSEL_R &= ~0xC0;            // not alternative
-	GPIO_PORTA_AMSEL_R &= ~0xC0;            // no analog
-	GPIO_PORTA_DEN_R |= 0xC0;               // enable PAs
+	GPIOPinTypeGPIOOutput(LCD_DATA_PORT, D4 | D5 | D6 | D7);
+	GPIOPinTypeGPIOOutput(LCD_COMMAND_PORT, RS | E);
 
-	// Initializing PortC
-	GPIO_PORTC_CR_R = 0xF0;                 // allow changes to PC4 => PC7
-	GPIO_PORTC_PCTL_R &= ~0xFFFF0000;       // GPIO clear bit PCTL
-	GPIO_PORTC_DIR_R |= 0xF0;               // PC4 => PC7 outputs
-	GPIO_PORTC_AFSEL_R &= ~0xF0;            // not alternative
-	GPIO_PORTC_AMSEL_R &= ~0xF0;            // no analog
-	GPIO_PORTC_DEN_R |= 0xF0;               // enable PCs
-
-	// Clear pins
-	GPIO_PORTC_DATA_R = 0x00;
-	GPIO_PORTA_DATA_R = 0x00;
-
-	// Wait for LCD to stabilize
-	//Wait time > 15ms
+	// Please refer to the HD44780 datasheet for how these initializations work!
 	SysCtlDelay((500e-3) * CLKSPEED / 3);
 
-	// Clear RS for instructions
-	GPIO_PORTA_DATA_R &= ~0x40;
+	GPIOPinWrite(LCD_COMMAND_PORT, RS, 0x00);
 
-	// Sets 4bit operation  0 0 | 0 0 1 0
-	GPIO_PORTC_DATA_R = 0x20;
-	LCD_ToggleEnable();
+	GPIOPinWrite(LCD_DATA_PORT, D4 | D5 | D6 | D7, 0x30);
+	GPIOPinWrite(LCD_COMMAND_PORT, E, E);
+	SysCtlDelay((20e-6) * CLKSPEED / 3);
+	GPIOPinWrite(LCD_COMMAND_PORT, E, 0x00);
 
-	// Select line display  0 0 | 0 0 1 0 1 0 * *
-	GPIO_PORTC_DATA_R = 0x20;
-	LCD_ToggleEnable();
-	GPIO_PORTC_DATA_R = 0x80;
-	LCD_ToggleEnable();
-
-	// Turn on display      0 0 | 0 0 0 0 1 1 1 1
-	GPIO_PORTC_DATA_R = 0x00;
-	LCD_ToggleEnable();
-	GPIO_PORTC_DATA_R = 0xF0;
-	LCD_ToggleEnable();
-
-	// Entry mode set       0 0 | 0 0 0 0 0 1 1 0
-	GPIO_PORTC_DATA_R = 0x00;
-	LCD_ToggleEnable();
-	GPIO_PORTC_DATA_R = 0x60;
-	LCD_ToggleEnable();
-
-	LCD_ClearScreen();
-}
-
-// Send chars of the string
-void LCD_SendChars(char *init) {
-	// Loop until null character
-	GPIO_PORTA_DATA_R |= 0x40;
-	//Wait time > 41ms
 	SysCtlDelay((50e-3) * CLKSPEED / 3);
-	while (*init) {
-		// Send the 4 most significant bits of the char
-		GPIO_PORTC_DATA_R = *init;
-		LCD_ToggleEnable();
-		// Send the 4 least significant bits of the char
-		GPIO_PORTC_DATA_R = *init << 4;
-		LCD_ToggleEnable();
-		// Change pointer to the next char
-		*init++;
-	}
+
+	GPIOPinWrite(LCD_DATA_PORT, D4 | D5 | D6 | D7, 0x30);
+	GPIOPinWrite(LCD_COMMAND_PORT, E, E);
+	SysCtlDelay((20e-6) * CLKSPEED / 3);
+	GPIOPinWrite(LCD_COMMAND_PORT, E, 0x00);
+
+	SysCtlDelay((50e-3) * CLKSPEED / 3);
+
+	GPIOPinWrite(LCD_DATA_PORT, D4 | D5 | D6 | D7, 0x30);
+	GPIOPinWrite(LCD_COMMAND_PORT, E, E);
+	SysCtlDelay((20e-6) * CLKSPEED / 3);
+	GPIOPinWrite(LCD_COMMAND_PORT, E, 0x00);
+
+	SysCtlDelay((10e-3) * CLKSPEED / 3);
+
+	GPIOPinWrite(LCD_DATA_PORT, D4 | D5 | D6 | D7, 0x20);
+	GPIOPinWrite(LCD_COMMAND_PORT, E, E);
+	SysCtlDelay((20e-6) * CLKSPEED / 3);
+	GPIOPinWrite(LCD_COMMAND_PORT, E, 0x00);
+
+	SysCtlDelay((10e-3) * CLKSPEED / 3);
+
+	LCD_Command(0x01);	// Clear the screen.
+	LCD_Command(0x06);	// Cursor moves right.
+	LCD_Command(0x0f);	// Cursor blinking, turn on LCD.
 }

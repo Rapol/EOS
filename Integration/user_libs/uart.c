@@ -2,7 +2,7 @@
  * uart.c
  *
  *  Created on: Nov 5, 2014
- *      Author: Luis de la Vega, Juan Miranda
+ *      Author: Luis de la Vega, Juan Miranda, Daniel Navarro, Rafael Pol
  */
 
 #include <stdio.h>
@@ -13,7 +13,6 @@
 #include <inc/tm4c123gh6pm.h>
 #include "inc/hw_memmap.h"
 #include "inc/hw_types.h"
-//#include "inc/hw_ints.h"
 #include "driverlib/sysctl.h"
 #include "driverlib/gpio.h"
 #include "driverlib/interrupt.h"
