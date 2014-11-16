@@ -81,7 +81,7 @@ float resistance_sample_real, resistance_sample_exp, resistance_pot = 0,
 double tempF = 0;
 char buffer[32];
 
-int pulse = 2, nyx = 0, experimentRunning = 0, experimentCooling = 0;
+int step = 2, nyx = 0, experimentRunning = 0, experimentCooling = 0;
 float setpointValues[256], setpoints = 0, setpointsDone = 0;
 
 int hours = 0, minutes = 0, seconds = 0;
@@ -123,33 +123,33 @@ void Timer0IntHandler(void) {
 	}
 }
 
-int pulseValueForTC(float setpoint) {
+int stepValueForTC(float setpoint) {
 	if (setpoint <= 71)
-		return (pulse = 2);
+		return (step = 2);
 	else if (setpoint <= 73)
-		return (pulse = 3);
+		return (step = 3);
 	else if (setpoint <= 74)
-		return (pulse = 5);
+		return (step = 5);
 	else if (setpoint <= 78)
-		return (pulse = 7);
+		return (step = 7);
 	else if (setpoint <= 88)
-		return (pulse = 9);
+		return (step = 9);
 	else if (setpoint <= 92)
-		return (pulse = 11);
+		return (step = 11);
 	else if (setpoint <= 98)
-		return (pulse = 13);
+		return (step = 13);
 	else if (setpoint <= 104)
-		return (pulse = 15);
+		return (step = 15);
 	else if (setpoint <= 113)
-		return (pulse = 17);
+		return (step = 17);
 	else if (setpoint <= 125)
-		return (pulse = 19);
+		return (step = 19);
 	else if (setpoint <= 135)
-		return (pulse = 21);
+		return (step = 21);
 	else if (setpoint <= 150)
-		return (pulse = 23);
+		return (step = 23);
 	else
-		return (pulse = 23);
+		return (step = 23);
 }
 
 void toggleLED(uint32_t LED) {
@@ -279,7 +279,7 @@ int main(void) {
 //			UART_Println(UART1_BASE, buffer);
 			if (!nyx && !heatingDone)
 				PWM_SetPulse(TC,
-						pulseValueForTC(setpointValues[currentSetpoint]));
+						stepValueForTC(setpointValues[currentSetpoint]));
 			if (heatingDone)
 				PWM_SetPulse(TC, 2);
 			PWM_SetFanVelocity(tempF, setpointValues[currentSetpoint], FAN);
@@ -325,16 +325,16 @@ int main(void) {
 					}
 				}
 				nyx = 0;
-				pulse = 0;
+				step = 0;
 			}
 			if (!(minutes % 2) && minutes) {
 				nyx = 1;
-				if (pulse == 23 && !heatingDone)
-					pulse -= 2;
+				if (step == 23 && !heatingDone)
+					step -= 2;
 //				else if (pulse == 0 && heatingDone)
 //					pulse += 2;
 				if (!heatingDone)
-					PWM_SetPulse(TC, (pulse += 2));
+					PWM_SetPulse(TC, (step += 2));
 //				else
 //					PWM_SetPulse(TC, (pulse -= 2));
 			}
@@ -346,7 +346,7 @@ int main(void) {
 		setpointsDone = 0;
 		experimentRunning = 0;
 		flag = 0;
-		pulse = 2;
+		step = 2;
 		nyx = 0;
 
 		// Cooling Phase
