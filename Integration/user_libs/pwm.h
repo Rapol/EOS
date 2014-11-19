@@ -11,10 +11,10 @@
 // PWM Pins
 // PE4 => M0PWM4 (Fan)
 
-#define PWM_FREQUENCY	25000
+#define PWM_FREQUENCY	250
 
 extern void PWM_Init(void);
-extern void PWM_SetPulse(uint32_t ui32PWMOut, int pulse);
+extern void PWM_SetPulse(uint32_t ui32PWMOut, int step);
 extern void PWM_SetFanVelocity(float currentTemp, float setpointTemp, uint32_t ui32PWMOut);
 
 #endif /* PWM_H_ */

@@ -71,7 +71,7 @@ void ADC_Init(void) {
 // Output: 8-bit result of ADC conversion
 float ADC_VoltageDifference(float *voltage_sample, float *voltage_ref) {
 
-//	ADCIntClear(ADC0_BASE, 0);
+	ADCIntClear(ADC0_BASE, 0);
 	ADCProcessorTrigger(ADC0_BASE, 0);
 
 	while (!ADCIntStatus(ADC0_BASE, 0, false))
@@ -79,7 +79,7 @@ float ADC_VoltageDifference(float *voltage_sample, float *voltage_ref) {
 
 	ADCSequenceDataGet(ADC0_BASE, 0, result_sample);
 
-//	ADCIntClear(ADC1_BASE, 0);
+	ADCIntClear(ADC1_BASE, 0);
 	ADCProcessorTrigger(ADC1_BASE, 0);
 
 	while (!ADCIntStatus(ADC1_BASE, 0, false))

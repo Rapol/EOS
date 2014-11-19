@@ -72,6 +72,7 @@
 #define TC	PWM_OUT_3
 #define RED_LED	GPIO_PIN_3
 #define BLUE_LED	GPIO_PIN_4
+#define MAX_STEP_INCREASE	10
 
 // Global variables
 int value = 0, command = 0x11, flag = 0, nop = 0;
@@ -81,14 +82,32 @@ float resistance_sample_real, resistance_sample_exp, resistance_pot = 0,
 double tempF = 0;
 char buffer[32];
 
-int step = 2, nyx = 0, experimentRunning = 0, experimentCooling = 0;
-float setpointValues[256], setpoints = 0, setpointsDone = 0;
+int step = 1, nyx = 0, experimentRunning = 0, experimentCooling = 0, heatingDone = 0, experimentHold = 0, currentSetpoint = 0;
+float setpointValues[256], setpoints = 0, setpointsDone = 0, totalDiff = 0;
 
-int hours = 0, minutes = 0, seconds = 0;
+int hours = 0, minutes = 0, seconds = 0, holdSeconds = 0;
+
+int uartBase = 0;
 
 void GPIOPortAHandler(void) {
 	GPIOIntClear(GPIO_PORTA_BASE, GPIO_PIN_2);
 	flag = 1;
+}
+
+int stepValueForTC(float setpoint, double tempF) {
+	float diff = 0;
+
+	if(!totalDiff)
+		totalDiff = setpoint - tempF;
+
+	diff = setpoint - tempF;
+
+	if(!heatingDone)
+		step = step + (diff/totalDiff * MAX_STEP_INCREASE);
+	else
+		step = step - (diff/totalDiff * MAX_STEP_INCREASE);
+
+	return step;
 }
 
 void Timer0IntHandler(void) {
@@ -102,7 +121,10 @@ void Timer0IntHandler(void) {
 		}
 	}
 	if (experimentRunning) {
-		LCD_WriteText("Experiment: Running", 0, 0);
+		if(!experimentHold)
+			LCD_WriteText("Experiment: Running", 0, 0);
+		else
+			LCD_WriteText("Experiment: Holding", 0, 0);
 		if (seconds >= 10 && minutes < 10)
 			sprintf(buffer, "Time: %d:0%d:%d", hours, minutes, seconds);
 		else if (seconds < 10 && minutes < 10)
@@ -121,35 +143,18 @@ void Timer0IntHandler(void) {
 		sprintf(buffer, "Time: %d s", seconds);
 		LCD_WriteText(buffer, 2, 0);
 	}
-}
 
-int stepValueForTC(float setpoint) {
-	if (setpoint <= 71)
-		return (step = 2);
-	else if (setpoint <= 73)
-		return (step = 3);
-	else if (setpoint <= 74)
-		return (step = 5);
-	else if (setpoint <= 78)
-		return (step = 7);
-	else if (setpoint <= 88)
-		return (step = 9);
-	else if (setpoint <= 92)
-		return (step = 11);
-	else if (setpoint <= 98)
-		return (step = 13);
-	else if (setpoint <= 104)
-		return (step = 15);
-	else if (setpoint <= 113)
-		return (step = 17);
-	else if (setpoint <= 125)
-		return (step = 19);
-	else if (setpoint <= 135)
-		return (step = 21);
-	else if (setpoint <= 150)
-		return (step = 23);
-	else
-		return (step = 23);
+	if(!(seconds%3) && !experimentHold && experimentRunning)
+		PWM_SetPulse(TC, stepValueForTC(setpointValues[currentSetpoint], tempF));
+
+	if((seconds == holdSeconds) && holdSeconds && seconds){
+		experimentHold = 0;
+		holdSeconds = 0;
+	}
+
+	if(experimentHold && !holdSeconds){
+		holdSeconds = seconds;
+	}
 }
 
 void toggleLED(uint32_t LED) {
@@ -162,12 +167,32 @@ void toggleLED(uint32_t LED) {
 	}
 }
 
+void UART0IntHandler(void){
+	uint32_t ui32Status;
+	ui32Status = UARTIntStatus(UART0_BASE, true); //get interrupt status
+	UARTIntClear(UART0_BASE, ui32Status); //clear the asserted interrupts
+
+	uartBase = UART0_BASE;
+}
+
+void UART1IntHandler(void){
+	uint32_t ui32Status;
+	ui32Status = UARTIntStatus(UART1_BASE, true); //get interrupt status
+	UARTIntClear(UART1_BASE, ui32Status); //clear the asserted interrupts
+
+	uartBase = UART1_BASE;
+}
+
 int main(void) {
 	// Set the clocking to run directly from the crystal.
 	SysCtlClockSet(
 	SYSCTL_SYSDIV_4 | SYSCTL_USE_PLL | SYSCTL_XTAL_16MHZ | SYSCTL_OSC_MAIN);
 
 	SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER0);
+	SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOB);
+	SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOE);
+	SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOA);
+	SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOC);
 
 	// Initialize ports
 	SPI_Init();
@@ -197,9 +222,12 @@ int main(void) {
 	GPIOPinTypeGPIOOutput(GPIO_PORTA_BASE, GPIO_PIN_3 | GPIO_PIN_4);
 	toggleLED(BLUE_LED);
 
-	UART_Println(UART1_BASE, "Enabling UART..."); // software reset
-	UART_Println(UART1_BASE, "UART enabled.");
-	UART_Println(UART1_BASE, INTRO);
+	while(!uartBase);
+	UARTCharGet(uartBase);
+
+	UART_Println(uartBase, "Enabling UART..."); // software reset
+	UART_Println(uartBase, "UART enabled.");
+	UART_Println(uartBase, INTRO);
 
 	do {
 		LCD_Command(0x01);	// Clear the screen.
@@ -210,16 +238,16 @@ int main(void) {
 		char create = '0';
 		do {
 			create = '0';
-			UART_Println(UART1_BASE,
+			UART_Println(uartBase,
 					"\r\nDo you want to run a new experiment? [y/n]");
 			while (create != 'y' && create != 'n') {
-				create = UARTCharGet(UART1_BASE);
+				create = UARTCharGet(uartBase);
 			}
 			if (create == 'n') {
-				UART_Println(UART1_BASE, "Do you wish to exit? [y/n]");
+				UART_Println(uartBase, "Do you wish to exit? [y/n]");
 				char exit = '0';
 				while (exit != 'y' && exit != 'n') {
-					exit = UARTCharGet(UART1_BASE);
+					exit = UARTCharGet(uartBase);
 				}
 				if (exit == 'y') {
 					return 0;
@@ -230,35 +258,35 @@ int main(void) {
 		do {
 			timber = '0';
 			setpoints = 0;
-			UART_Printf(UART1_BASE,
+			UART_Printf(uartBase,
 					"\r\nEnter the amount of setpoints for this experiment: ");
 			while (!setpoints) {
-				setpoints = UARTCharGet(UART1_BASE);
+				setpoints = UARTCharGet(uartBase);
 			}
 			float setpointValue = 0;
-			UART_Println(UART1_BASE,
+			UART_Println(uartBase,
 					"\r\nNOTE: Termperature values are interpreted in Fahrenheit");
 			int i = 0;
 			for (i = 0; i < setpoints; i++) {
 				sprintf(buffer, "Enter value for setpoint #%d: ", (i + 1));
-				UART_Printf(UART1_BASE, buffer);
+				UART_Printf(uartBase, buffer);
 				while (!setpointValue) {
-					setpointValue = UARTCharGet(UART1_BASE);
+					setpointValue = UARTCharGet(uartBase);
 				}
 				sprintf(buffer, "%.1f", setpointValue);
-				UART_Println(UART1_BASE, buffer);
+				UART_Println(uartBase, buffer);
 				setpointValues[i] = setpointValue;
 				setpointValue = 0;
 			}
-			UART_Println(UART1_BASE, "Are you sure about this? [y/n]");
+			UART_Println(uartBase, "Are you sure about this? [y/n]");
 			while (timber != 'y' && timber != 'n') {
-				timber = UARTCharGet(UART1_BASE);
+				timber = UARTCharGet(uartBase);
 			}
 			if (timber == 'n') {
-				UART_Println(UART1_BASE, "Do you wish to exit? [y/n]");
+				UART_Println(uartBase, "Do you wish to exit? [y/n]");
 				char exit = '0';
 				while (exit != 'y' && exit != 'n') {
-					exit = UARTCharGet(UART1_BASE);
+					exit = UARTCharGet(uartBase);
 				}
 				if (exit == 'y') {
 					return 0;
@@ -269,24 +297,18 @@ int main(void) {
 		LCD_Command(0x01);	// Clear the screen.
 		toggleLED(RED_LED);
 		int i = 0;
-		int currentSetpoint = 0;
-		int heatingDone = 0;
-		UART_Println(UART1_BASE, "Temperature \t| Resistance");
+		currentSetpoint = 0;
+		heatingDone = 0;
+		UART_Println(uartBase, "Temperature \t| Resistance");
 		hours = minutes = seconds = 0;
 		experimentRunning = 1;
 		while (1) {
 			tempF = 1.8 * (SPI_ReadTemperature() * 0.25) + 32;
-//			UART_Println(UART1_BASE, buffer);
-			if (!nyx && !heatingDone)
-				PWM_SetPulse(TC,
-						stepValueForTC(setpointValues[currentSetpoint]));
-			if (heatingDone)
-				PWM_SetPulse(TC, 2);
 			PWM_SetFanVelocity(tempF, setpointValues[currentSetpoint], FAN);
-//			sprintf(buffer, "%.1f F \t %d:%d:%d \r", tempF, hours, minutes,
-//					seconds);
-//			UART_Printf(UART1_BASE, buffer);
 			if (round(tempF) == setpointValues[currentSetpoint]) { //(roundf(tempF * 10.0) / 10.0)
+				experimentHold = 1;
+				while(experimentHold)
+					tempF = 1.8 * (SPI_ReadTemperature() * 0.25) + 32;
 				float currentTemp = setpointValues[currentSetpoint];
 				if ((currentSetpoint + 1) == setpoints) {
 					heatingDone = 1;
@@ -301,11 +323,11 @@ int main(void) {
 				for (i = 0; i <= 255; i++) {
 					voltage_difference_old = voltage_difference;
 					SPI_WriteToPotentiometer(command, i);
-					resistance_pot = i * 390.625 + 146.1;
+					resistance_pot = i * 390.625 + 125;
 					voltage_difference = ADC_VoltageDifference(&voltage_sample,
 							&voltage_ref);
 					if (voltage_difference > voltage_difference_old
-							&& voltage_difference_old != 0) {
+							&& voltage_difference_old) {
 						resistance_sample_exp = resistance_pot
 								* RESISTANCE_RATIO;
 						offset = (voltage_sample * resistance_pot)
@@ -317,26 +339,13 @@ int main(void) {
 						resistance_sample_real = resistance_sample_exp * offset;
 						sprintf(buffer, "%.1f \t| %.1f", currentTemp,
 								resistance_sample_real);
-						UART_Println(UART1_BASE, buffer);
+						UART_Println(uartBase, buffer);
 						setpointsDone++;
-//						LCD_ClearScreen();
-//						LCD_SendChars(buffer);
+						totalDiff = 0;
+						voltage_difference = voltage_difference_old = 0;
 						break;
 					}
 				}
-				nyx = 0;
-				step = 0;
-			}
-			if (!(minutes % 2) && minutes) {
-				nyx = 1;
-				if (step == 23 && !heatingDone)
-					step -= 2;
-//				else if (pulse == 0 && heatingDone)
-//					pulse += 2;
-				if (!heatingDone)
-					PWM_SetPulse(TC, (step += 2));
-//				else
-//					PWM_SetPulse(TC, (pulse -= 2));
 			}
 			if (flag) {
 				break;
@@ -346,20 +355,19 @@ int main(void) {
 		setpointsDone = 0;
 		experimentRunning = 0;
 		flag = 0;
-		step = 2;
-		nyx = 0;
+		step = 1;
 
 		// Cooling Phase
-		PWM_SetPulse(TC, 2);
+		PWM_SetPulse(TC, 1);
 		LCD_Command(0x01);	// Clear the screen.
 		LCD_WriteText("Experiment: Cooling", 1, 0);
 		experimentCooling = 1;
 		seconds = 0;
-		PWM_SetPulse(FAN, 23);
+		PWM_SetPulse(FAN, 1561);
 		while (seconds < 59)
 			;
 		experimentCooling = 0;
-		PWM_SetPulse(FAN, 2);
+		PWM_SetPulse(FAN, 1);
 	} while (1);
 
 }

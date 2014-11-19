@@ -25,6 +25,7 @@ main.obj: C:/ti/TivaWare_C_Series-2.1.0.12573/driverlib/pin_map.h
 main.obj: C:/ti/TivaWare_C_Series-2.1.0.12573/driverlib/rom.h
 main.obj: C:/ti/TivaWare_C_Series-2.1.0.12573/driverlib/uart.h
 main.obj: C:/ti/TivaWare_C_Series-2.1.0.12573/driverlib/timer.h
+main.obj: C:/ti/TivaWare_C_Series-2.1.0.12573/driverlib/pwm.h
 main.obj: ../user_libs/adc.h
 main.obj: ../user_libs/lcd.h
 main.obj: ../user_libs/uart.h
@@ -56,6 +57,7 @@ C:/ti/TivaWare_C_Series-2.1.0.12573/driverlib/pin_map.h:
 C:/ti/TivaWare_C_Series-2.1.0.12573/driverlib/rom.h: 
 C:/ti/TivaWare_C_Series-2.1.0.12573/driverlib/uart.h: 
 C:/ti/TivaWare_C_Series-2.1.0.12573/driverlib/timer.h: 
+C:/ti/TivaWare_C_Series-2.1.0.12573/driverlib/pwm.h: 
 ../user_libs/adc.h: 
 ../user_libs/lcd.h: 
 ../user_libs/uart.h: 

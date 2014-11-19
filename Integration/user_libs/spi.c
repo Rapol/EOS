@@ -34,12 +34,10 @@ void SPI_Init(void) {
 	// Initialize the 3 pins we will need for SPI communication with the Potentiometer
 	//
 	SysCtlPeripheralEnable(SYSCTL_PERIPH_SSI2);
-	SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOE);
 	// connect CS to pin E5
 	GPIOPinTypeGPIOOutput(GPIO_PORTE_BASE, GPIO_PIN_5);
 	GPIOPinWrite(GPIO_PORTE_BASE, GPIO_PIN_5, 0);
 	// Connect SPI to PB4 (clock), PB6 (RX) and PB7(TX)
-	SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOB);
 	GPIOPinConfigure(GPIO_PB4_SSI2CLK);
 	GPIOPinConfigure(GPIO_PB7_SSI2TX);
 	GPIOPinConfigure(GPIO_PB6_SSI2RX);

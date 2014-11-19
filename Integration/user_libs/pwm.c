@@ -35,9 +35,6 @@ void PWM_Init(void) {
 	SysCtlPWMClockSet(SYSCTL_PWMDIV_64);
 
 	//PWM Peripheral Enable
-
-	SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOE);
-	SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOB);
 	SysCtlPeripheralEnable(SYSCTL_PERIPH_PWM0);
 
 	//Configure PE4 & PB5 Pins as PWM
@@ -75,41 +72,41 @@ void PWM_Init(void) {
 	PWMOutputState(PWM0_BASE, PWM_OUT_3_BIT, true);
 }
 
-void PWM_SetPulse(uint32_t ui32PWMOut, int pulse) {
-	PWMPulseWidthSet(PWM0_BASE, ui32PWMOut, pulse);
+void PWM_SetPulse(uint32_t ui32PWMOut, int step) {
+	PWMPulseWidthSet(PWM0_BASE, ui32PWMOut, step*2);
 }
 
 void PWM_SetFanVelocity(float currentTemp, float setpointTemp, uint32_t ui32PWMOut) {
 	float tempDiff = currentTemp - setpointTemp;
 
-	if (tempDiff < 10) {
-		PWM_SetPulse(ui32PWMOut, 0);
+	if (tempDiff < 4) {
+		PWM_SetPulse(ui32PWMOut, 1);
 	}
-	else if ((tempDiff >= 10) && (tempDiff <= 13)) {
-		PWM_SetPulse(ui32PWMOut, 6);
+	else if ((tempDiff >= 4) && (tempDiff <= 7)) {
+		PWM_SetPulse(ui32PWMOut, 391);
 	}
-	else if ((tempDiff >= 14) && (tempDiff <= 17)) {
-		PWM_SetPulse(ui32PWMOut, 8);
+	else if ((tempDiff >= 8) && (tempDiff <= 11)) {
+		PWM_SetPulse(ui32PWMOut, 521);
 	}
-	else if ((tempDiff >= 18) && (tempDiff <= 21)) {
-		PWM_SetPulse(ui32PWMOut, 10);
+	else if ((tempDiff >= 12) && (tempDiff <= 15)) {
+		PWM_SetPulse(ui32PWMOut, 651);
 	}
-	else if ((tempDiff >= 22) && (tempDiff <= 25)) {
-		PWM_SetPulse(ui32PWMOut, 12);
+	else if ((tempDiff >= 16) && (tempDiff <= 19)) {
+		PWM_SetPulse(ui32PWMOut, 781);
 	}
-	else if ((tempDiff >= 26) && (tempDiff <= 28)) {
-		PWM_SetPulse(ui32PWMOut, 14);
+	else if ((tempDiff >= 20) && (tempDiff <= 23)) {
+		PWM_SetPulse(ui32PWMOut, 912);
 	}
-	else if ((tempDiff >= 29) && (tempDiff <= 32)) {
-		PWM_SetPulse(ui32PWMOut, 16);
+	else if ((tempDiff >= 24) && (tempDiff <= 27)) {
+		PWM_SetPulse(ui32PWMOut, 1042);
 	}
-	else if ((tempDiff >= 29) && (tempDiff <= 32)) {
-		PWM_SetPulse(ui32PWMOut, 18);
+	else if ((tempDiff >= 28) && (tempDiff <= 32)) {
+		PWM_SetPulse(ui32PWMOut, 1172);
 	}
 	else if ((tempDiff >= 33) && (tempDiff <= 35)) {
-		PWM_SetPulse(ui32PWMOut, 20);
+		PWM_SetPulse(ui32PWMOut, 1302);
 	}
 	else {
-		PWM_SetPulse(ui32PWMOut, 22);
+		PWM_SetPulse(ui32PWMOut, 1561);
 	}
 }

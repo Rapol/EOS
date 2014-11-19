@@ -33,7 +33,9 @@
 //
 void UART_Init(void) {
 	// Enable the GPIO Peripheral used by the UARTs.
-	SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOB);
+//	SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOB);
+	// Enable UART0
+	SysCtlPeripheralEnable(SYSCTL_PERIPH_UART0);
 	// Enable UART1
 	SysCtlPeripheralEnable(SYSCTL_PERIPH_UART1);
 
@@ -42,19 +44,34 @@ void UART_Init(void) {
 //	IntEnable(INT_UART1);
 //	UARTIntEnable(UART1_BASE, UART_INT_RX | UART_INT_RT);
 
+	// Configure GPIO pins for UART0
+	GPIOPinConfigure(GPIO_PA0_U0RX);
+	GPIOPinConfigure(GPIO_PA1_U0TX);
+	GPIOPinTypeUART(GPIO_PORTA_BASE, GPIO_PIN_0 | GPIO_PIN_1);
 	// Configure GPIO pins for UART1
 	GPIOPinConfigure(GPIO_PB0_U1RX);
 	GPIOPinConfigure(GPIO_PB1_U1TX);
 	GPIOPinTypeUART(GPIO_PORTB_BASE, GPIO_PIN_0 | GPIO_PIN_1);
 
+	// Enable debug console on UART0 at 115200 baud
+	UARTClockSourceSet(UART0_BASE, UART_CLOCK_PIOSC);
+	UARTConfigSetExpClk(UART0_BASE, 16000000, 9600,
+	        (UART_CONFIG_WLEN_8 | UART_CONFIG_STOP_ONE | UART_CONFIG_PAR_NONE));
 	// Setup UART1 at 9600 baud
 	UARTClockSourceSet(UART1_BASE, UART_CLOCK_PIOSC);
 	UARTConfigSetExpClk(UART1_BASE, 16000000, 9600,
 			(UART_CONFIG_WLEN_8 | UART_CONFIG_STOP_ONE | UART_CONFIG_PAR_NONE));
 	// Enable RTS/CTS HW flow control for UART1
 	UARTFlowControlSet(UART1_BASE, UART_FLOWCONTROL_RX | UART_FLOWCONTROL_TX);
+
+	UARTEnable(UART0_BASE);
 	// Enable UART1, this call also enables the FIFO buffer necessary for HW flow control
 	UARTEnable(UART1_BASE);
+
+	IntEnable(INT_UART0); //enable the UART interrupt
+	IntEnable(INT_UART1); //enable the UART interrupt
+	UARTIntEnable(UART0_BASE, UART_INT_RX | UART_INT_RT); //only enable RX and TX interrupts
+	UARTIntEnable(UART1_BASE, UART_INT_RX | UART_INT_RT); //only enable RX and TX interrupts
 }
 
 //

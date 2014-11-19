@@ -97,8 +97,6 @@ void LCD_Command(unsigned char command) {
 }
 
 void LCD_Init(void) {
-	SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOA);
-	SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOC);
 
 	GPIOPinTypeGPIOOutput(LCD_DATA_PORT, D4 | D5 | D6 | D7);
 	GPIOPinTypeGPIOOutput(LCD_COMMAND_PORT, RS | E);
