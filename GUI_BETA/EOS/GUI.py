@@ -35,7 +35,8 @@ class eos:
         
         self.queue = queue.Queue()
         
-        self.idAfter = None
+        self.tickID = None
+        self.bufferID = None
         
         """ Init Windows """
         
@@ -236,8 +237,8 @@ class eos:
             self.connected = self.queue.get()
             try:
                 self.connected.getPort()
-                self.connected.sendByte(b'\x42', self.queue)
-                self.checkBufferQueue()
+                # Init Connection
+                self.connected.initUI()
             except:
                 tkinter.messagebox.showwarning("Opening Port","Unavailable to connect to the port")
                 print("Error! " + str(self.connected))
@@ -246,10 +247,30 @@ class eos:
             self.myParent.after(100,self.checkConnectQueue)
             
     def checkBufferQueue(self):
-        if not self.queue.empty():
-            print (self.queue.get().decode())
-        else:
-            self.myParent.after(100,self.checkBufferQueue)
+        def callback():
+            if not self.queue.empty():
+                header = self.queue.get()
+                if header == b'0':
+                    # temp update
+                    temp = ''
+                    nextChar = self.queue.get()
+                    while(nextChar != b'\n'):
+                        temp += nextChar.decode()
+                        nextChar = self.queue.get()
+                    print (temp)
+                    self.currentTempL['text'] = 'Temperature: ' + temp
+                elif header == b'1':
+                    # resistance update
+                    resistance = ''
+                    nextChar = self.queue.get()
+                    while(nextChar != b'\n'):
+                        resistance += nextChar.decode()
+                        nextChar = self.queue.get()
+                    print (resistance)
+                    self.runningTable.insert("", "end", "", values=((self.timeL.cget("text"),self.currentTempL.cget("text"), resistance)), tag = 1)
+            self.bufferID = self.myParent.after(500,callback)
+        t = threading.Thread(target=callback)
+        t.start()
             
     """ Create new Experiment Popup"""
     def initCreateExpPopup(self):
@@ -423,7 +444,11 @@ class eos:
             # Creating file 'expName'.info to write the description of the experiment
             with open('./Experiments/'+self.nameE.get()+'.info', 'w') as outfile:
                 json.dump(currentExp, outfile)
+            # Send Exp commands
             self.connected.initStepExperiment(currentExp)
+            # Init updater
+            self.connected.updater(self.queue,self.myParent)
+            self.checkBufferQueue()
         else:
             # its a custom interval experiment
             # Get the list of temps from the interval List
@@ -435,6 +460,11 @@ class eos:
             # Creating file 'expName'.info to write the description of the experiment
             with open('./Experiments/'+self.nameE.get()+'.info', 'w') as outfile:
                 json.dump(currentExp, outfile)
+            # Send Exp commands
+            self.connected.initExperiment(currentExp)
+            # Init updater
+            self.connected.updater(self.queue)
+            self.checkBufferQueue()
                 
         self.createPopup.destroy()
         
@@ -457,7 +487,7 @@ class eos:
         self.time += 1
         if self.runningExpFrame.winfo_exists():
             self.runningTimeL['text'] = 'Elapsed Time: ' + str(datetime.timedelta(seconds=self.time))  
-        self.idAfter = self.myParent.after(1000, self.tick)
+        self.tickID = self.myParent.after(1000, self.tick)
     
     """ Initialize running Exp View"""
     def initRunningExpView(self):
@@ -516,14 +546,14 @@ class eos:
         self.runningTable.configure(yscrollcommand=self.runningTreeScroll.set)
         self.runningTreeScroll.config(command=self.runningTable)
         
-        self.runningTable.insert("", "end", "", values=(("1:20","33C", "75K")), tag = 1)
-        self.runningTable.insert("", "end", "", values=(("1:34","44C", "67K")), tag = 0)
-        self.runningTable.insert("", "end", "", values=(("2:04","47C", "55K")), tag = 1)
-        self.runningTable.insert("", "end", "", values=(("2:32","52C", "45K")), tag = 0)
-        self.runningTable.insert("", "end", "", values=(("2:57","66C", "48K")), tag = 1)
-        self.runningTable.insert("", "end", "", values=(("3:33","52C", "50K")), tag = 0)
-        self.runningTable.insert("", "end", "", values=(("3:43","47C", "53K")), tag = 1)
-        self.runningTable.insert("", "end", "", values=(("3:56","44C", "57K")), tag = 0)
+#         self.runningTable.insert("", "end", "", values=(("1:20","33C", "75K")), tag = 1)
+#         self.runningTable.insert("", "end", "", values=(("1:34","44C", "67K")), tag = 0)
+#         self.runningTable.insert("", "end", "", values=(("2:04","47C", "55K")), tag = 1)
+#         self.runningTable.insert("", "end", "", values=(("2:32","52C", "45K")), tag = 0)
+#         self.runningTable.insert("", "end", "", values=(("2:57","66C", "48K")), tag = 1)
+#         self.runningTable.insert("", "end", "", values=(("3:33","52C", "50K")), tag = 0)
+#         self.runningTable.insert("", "end", "", values=(("3:43","47C", "53K")), tag = 1)
+#         self.runningTable.insert("", "end", "", values=(("3:56","44C", "57K")), tag = 0)
         self.runningTable.tag_configure(1, background = "#EFEFEF",font = self.generalfont)
         self.runningTable.tag_configure(0,font = self.generalfont)
         
@@ -693,7 +723,8 @@ class eos:
             # init time
             self.time = 0
             # Cancel tick callback
-            root.after_cancel(self.idAfter)
+            root.after_cancel(self.tickID)
+            root.after_cancel(self.bufferID)
             # delete 
             try:
                 # Check if theres a dat file
@@ -709,6 +740,7 @@ class eos:
             # Delete current experiment reference
             currentExp = None
             self.backHomeRunning()
+            self.connected.sendByte(self.connected.ABORT)
     
     def stepChecker(self):
         if re.match(r'^[\w\d_()]*',self.nameE.get()):
