@@ -3,6 +3,8 @@ from tkinter.ttk import Treeview
 from tkinter.constants import DISABLED
 from EOS.connect import Connection
 import json,os,glob,threading,queue,datetime
+import tkinter.messagebox
+import serial.tools.list_ports
 
 class eos:
     
@@ -12,6 +14,8 @@ class eos:
         self.buttonPadx = 40
         self.buttonPadxAbout = 112
         self.buttonPady = 5
+        
+        send("hi")
         
         self.paddingPopup = 10
         self.paddinTitlePopup = 50
@@ -33,6 +37,8 @@ class eos:
         self.ExpFrame = None
         
         self.queue = queue.Queue()
+        
+        self.idAfter = None
         
         """ Init Windows """
         
@@ -72,9 +78,6 @@ class eos:
             expElement = json.load(json_data)
             # Insert it in the list
             self.listBox.insert(i, expElement["name"])
-            # If a .txt is found, a experiment is running
-#             if len(glob.glob(os.path.join(os.getcwd()+"\Experiments\\" + expElement["name"]+".txt"))) == 1:
-#                 self.listBox.itemconfig(i, bg = "green")
             
         self.listBox.pack(side = "left",fill="y")
          
@@ -107,9 +110,8 @@ class eos:
         
         # Port Frame for COM ports
         self.portFrame = Frame(self.statusGroup, bg = self.background, pady = self.paddingGeneralExp)
-        # Label and entry for port connection
+        # Label for port connection
         self.connectL = Label(self.portFrame,text = "Connect to Port: ",fg=self.foreground, bg = self.background, font = self.generalfont)
-        self.connectE = Entry(self.portFrame, font = self.generalfont)
         
         # Create Button
         self.createExperimentB = Button(self.homeFrame, text = "Create New Experiment",fg = "black",bg="#F3A262", padx = self.buttonPadx, pady = self.buttonPady, font = self.generalfont,command=self.initCreateExpPopup)
@@ -146,9 +148,19 @@ class eos:
         
         # Port Frame for COM ports
         self.portFrame = Frame(self.statusGroup, bg = self.background, pady = self.paddingGeneralExp)
-        # Label and entry for port connection
+        
+        # Label and dropdown for port connection
         self.connectL = Label(self.portFrame,text = "Connect to Port: ",fg=self.foreground, bg = self.background, font = self.generalfont)
-        self.connectE = Entry(self.portFrame, font = self.generalfont)
+        # Get port list
+        ports = list(serial.tools.list_ports.comports())
+        portNames = list()
+        for port in ports:
+            portNames.append(port[0])
+        self.portDropS = StringVar()
+        self.portDropS.set(portNames[0])
+        self.portDrop = OptionMenu(self.portFrame, self.portDropS, *portNames)
+        
+        #self.connectE = Entry(self.portFrame, font = self.generalfont)
         
         # Modify Label and button state
         self.statusL["text"] = "System not connected"
@@ -158,7 +170,7 @@ class eos:
         
         # Pack connect options
         self.connectL.pack(side=LEFT)
-        self.connectE.pack(side=RIGHT)
+        self.portDrop.pack(side=RIGHT)
         
         # Pack label, port frame and button
         self.statusL.pack()
@@ -182,7 +194,7 @@ class eos:
         # Callbacks
         def callbackConnect():
             # Open port
-            port = self.connectE.get()
+            port = self.portDropS.get()
             print (port)
             try:
                 self.connected = Connection(port)
@@ -226,6 +238,7 @@ class eos:
             try:
                 self.connected.getPort()
             except:
+                tkinter.messagebox.showwarning("Opening Port","Unavailable to connect to the port")
                 print("Error! " + str(self.connected))
             self.initConnectedStatus()
         else:
@@ -429,12 +442,13 @@ class eos:
         self.time = 0
         self.initRunningExpView()
         self.tick()
-        
+       
+    """ Tick tack """ 
     def tick(self):
         self.time += 1
         if self.runningExpFrame.winfo_exists():
             self.runningTimeL['text'] = 'Elapsed Time: ' + str(datetime.timedelta(seconds=self.time))  
-        self.myParent.after(1000, self.tick)
+        self.idAfter = self.myParent.after(1000, self.tick)
     
     """ Initialize running Exp View"""
     def initRunningExpView(self):
@@ -505,7 +519,7 @@ class eos:
         self.runningTable.tag_configure(0,font = self.generalfont)
         
         # Abort Button
-        self.abortB = Button(group, text = "Abort",fg = "black",bg="#F3A262", pady = self.buttonPady, font = self.generalExpfont)
+        self.abortB = Button(group, text = "Abort",fg = "black",bg="#F3A262", pady = self.buttonPady, font = self.generalExpfont, command = self.abort)
         self.abortB.grid(row=4,column=0, pady = self.paddingGeneralExp*2, sticky = E+W)
         
         self.backBRunning = Button(group, text = "Back",fg = "black",bg="#F3A262", pady = self.buttonPady, font = self.generalExpfont, command = self.backHomeRunning)
@@ -519,6 +533,28 @@ class eos:
     
     """ Init Experiment Frame View"""
     def initExperimentFrameView(self,value):
+        
+        filename = os.path.join(os.getcwd()+"\Experiments", value + ".info")
+        
+        # Opening info and data files
+        try:
+            json_data = open( filename, "r" )
+        except:
+            tkinter.messagebox.showwarning("Open file","Cannot open this file\n(%s)" % filename)
+            return
+            
+        self.info = json.load(json_data)
+        
+        filename =  os.path.join(os.getcwd()+"\Experiments", value + ".dat")
+        
+        try:
+            json_data = open(filename , "r")
+        except:
+            tkinter.messagebox.showwarning("Open file","Cannot open this file\n(%s)" % filename)
+            return
+        
+        # Get the result file of the experiment
+        results = json.load(json_data)
         
         # Destroy current View
         if self.homeFrame.winfo_exists():
@@ -534,28 +570,6 @@ class eos:
         else:
             print("Deleting running exp")
             self.runningExpFrame.destroy()
-        
-        # Get info file of the experiment
-        # os.path.join returns a list of .info files, history and files are organize in the same manner
-        # curselection returns a list of selected item
-        # Only one item is selected [0] which correspond to the index in the os.path.list
-        # TODO: DONT RELY ON THIS METHOD
-        
-        #index = int(self.listBox.curselection()[0])
-        
-        #file = glob.glob(os.path.join(os.getcwd()+"\Experiments", '*.info'))[int(self.listBox.curselection()[0])]
-        #file = open(os.path.join(os.getcwd()+"\Experiments",'*.info') )
-        
-#         for filename in glob.glob(os.path.join(os.getcwd()+"\Experiments", '*.info')):
-#             print (filename)
-        
-        json_data= open( os.path.join(os.getcwd()+"\Experiments", value + ".info"), "r" )
-        self.info = json.load(json_data)
-        
-        # Get the result file of the experiment
-        file = glob.glob(os.path.join(os.getcwd()+"\Experiments", '*.dat'))[int(self.listBox.curselection()[0])]
-        json_data=open(file)
-        results = json.load(json_data)
         
         # Create experiment Frame
         self.ExpFrame = Frame(self.right_frame, relief=RIDGE, bg = self.background)
@@ -661,6 +675,29 @@ class eos:
             if(self.listBox.get(i) == name):
                 index = i
         return index
+    
+    def abort(self):
+        global currentExp
+        if tkinter.messagebox.askyesno("Abort", "Abort this experiment?\nData will be save"):
+            # init time
+            self.time = 0
+            # Cancel tick callback
+            root.after_cancel(self.idAfter)
+            # delete 
+            try:
+                # Check if theres a dat file
+                open(os.path.join(os.getcwd()+"\Experiments", currentExp["name"] + ".dat"))
+            except:
+                # if not delete the experiment for good
+                os.remove(os.path.join(os.getcwd()+"\Experiments", currentExp["name"] + ".info"))
+                # Remove experiment from listbox 
+                for i,item in enumerate(self.listBox.get(0, END)):
+                    if currentExp["name"] == self.listBox.get(i):
+                        self.listBox.delete(i)
+                        break
+            # Delete current experiment reference
+            currentExp = None
+            self.backHomeRunning()
         
 if __name__ == "__main__":
     currentExp = None
@@ -668,3 +705,6 @@ if __name__ == "__main__":
     root.title("EOS Measuring System")
     app = eos(root)
     root.mainloop()
+    
+def send(text):
+    pass
