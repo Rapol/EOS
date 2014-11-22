@@ -15,8 +15,6 @@ class eos:
         self.buttonPadxAbout = 112
         self.buttonPady = 5
         
-        send("hi")
-        
         self.paddingPopup = 10
         self.paddinTitlePopup = 50
         self.paddingTitleExp = 30
