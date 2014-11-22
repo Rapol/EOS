@@ -198,6 +198,7 @@ class eos:
                 self.connected = Connection(port)
                 self.queue.put(self.connected)
             except:
+                tkinter.messagebox.showwarning("Opening Port","Unavailable to connect to the port")
                 e = sys.exc_info()[0]
                 print(e)
                 
@@ -208,6 +209,7 @@ class eos:
                 self.connected = None
                 self.queue.put(1)
             except:
+                tkinter.messagebox.showwarning("Closing Port","Unavailable to close to the port")
                 e = sys.exc_info()[0]
                 self.queue.put(e)
                 
@@ -236,7 +238,6 @@ class eos:
             try:
                 self.connected.getPort()
             except:
-                tkinter.messagebox.showwarning("Opening Port","Unavailable to connect to the port")
                 print("Error! " + str(self.connected))
             self.initConnectedStatus()
         else:
@@ -699,10 +700,8 @@ class eos:
         
 if __name__ == "__main__":
     currentExp = None
-    root = Tk();
+    root = Tk()
     root.title("EOS Measuring System")
     app = eos(root)
     root.mainloop()
     
-def send(text):
-    pass
