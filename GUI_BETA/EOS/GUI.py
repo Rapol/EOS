@@ -2,9 +2,8 @@ from tkinter import *
 from tkinter.ttk import Treeview
 from tkinter.constants import DISABLED
 from EOS.connect import Connection
-import json,os,glob,threading,queue,datetime
-import tkinter.messagebox
-import serial.tools.list_ports
+import json,os,glob,threading,queue,datetime, tkinter.messagebox, serial.tools.list_ports, re
+from time import sleep
 
 class eos:
     
@@ -237,11 +236,20 @@ class eos:
             self.connected = self.queue.get()
             try:
                 self.connected.getPort()
+                self.connected.sendByte(b'\x42', self.queue)
+                self.checkBufferQueue()
             except:
+                tkinter.messagebox.showwarning("Opening Port","Unavailable to connect to the port")
                 print("Error! " + str(self.connected))
             self.initConnectedStatus()
         else:
             self.myParent.after(100,self.checkConnectQueue)
+            
+    def checkBufferQueue(self):
+        if not self.queue.empty():
+            print (self.queue.get().decode())
+        else:
+            self.myParent.after(100,self.checkBufferQueue)
             
     """ Create new Experiment Popup"""
     def initCreateExpPopup(self):
@@ -297,7 +305,7 @@ class eos:
         
         self.minTemL = Label(self.createPopup, text = "Min Temperature", bg = self.background, font = self.generalfont)
         self.minTemL.grid(row=3, column=0, padx=self.paddingPopup, pady=self.paddingPopup, sticky = E)
-        self.minTemE = Spinbox(self.createPopup, font = self.generalfont, from_=27, to=120, width = 18)
+        self.minTemE = Spinbox(self.createPopup, font = self.generalfont, from_=21, to=120, width = 18)
         self.minTemE.grid(row=3, column=1, padx=self.paddingPopup, pady=self.paddingPopup, sticky = W)
         
         self.intervalL = Label(self.createPopup, text = "Interval", bg = self.background, font = self.generalfont)
@@ -405,6 +413,7 @@ class eos:
         global currentExp
         if self.oldRadio == 1:
             # Its a step experiment
+            self.stepChecker()
             currentExp = { "name": self.nameE.get(),
                     "type": self.oldRadio,
                     "maxTemp": self.maxTemE.get(),
@@ -414,6 +423,7 @@ class eos:
             # Creating file 'expName'.info to write the description of the experiment
             with open('./Experiments/'+self.nameE.get()+'.info', 'w') as outfile:
                 json.dump(currentExp, outfile)
+            self.connected.initStepExperiment(currentExp)
         else:
             # its a custom interval experiment
             # Get the list of temps from the interval List
@@ -662,6 +672,7 @@ class eos:
                 print("init Experiment Frame 2")
                 self.initExperimentFrameView(value)
     
+    """ Sorts the history list """
     def sort_list(self,name):
         temp_list = list(self.listBox.get(0, END))
         temp_list.sort(key=str.lower)
@@ -675,6 +686,7 @@ class eos:
                 index = i
         return index
     
+    """ Abort callback for a running experiment"""
     def abort(self):
         global currentExp
         if tkinter.messagebox.askyesno("Abort", "Abort this experiment?\nData will be save"):
@@ -691,17 +703,23 @@ class eos:
                 os.remove(os.path.join(os.getcwd()+"\Experiments", currentExp["name"] + ".info"))
                 # Remove experiment from listbox 
                 for i,item in enumerate(self.listBox.get(0, END)):
-                    if currentExp["name"] == self.listBox.get(i):
+                    if currentExp["name"] == item:
                         self.listBox.delete(i)
                         break
             # Delete current experiment reference
             currentExp = None
             self.backHomeRunning()
+    
+    def stepChecker(self):
+        if re.match(r'^[\w\d_()]*',self.nameE.get()):
+            print ('yes')
+        else: 
+            print ('false')
         
 if __name__ == "__main__":
     currentExp = None
     root = Tk()
     root.title("EOS Measuring System")
-    app = eos(root)
+    eos(root)
     root.mainloop()
     
