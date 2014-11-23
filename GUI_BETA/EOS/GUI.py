@@ -2,8 +2,9 @@ from tkinter import *
 from tkinter.ttk import Treeview
 from tkinter.constants import DISABLED
 from EOS.connect import Connection
-import json,os,glob,threading,queue,datetime, tkinter.messagebox, serial.tools.list_ports, re
+import json,os,glob,threading,queue,datetime, tkinter.messagebox, serial.tools.list_ports, re,time,csv
 from math import floor
+from tkinter.filedialog import FileDialog
 
 class eos:
     
@@ -38,12 +39,13 @@ class eos:
         self.tickID = None
         self.bufferID = None
         
+        
         """ Init Windows """
         
         # Parent
         self.myParent = parent
         self.myParent.minsize(800, 600)
-        self.myParent.config(bg="green")
+        self.myParent.protocol('WM_DELETE_WINDOW', self.closingWindow)
         
         ## Frame for the listbox located at the left of the window
         self.left_frame = Frame(self.myParent)
@@ -239,10 +241,11 @@ class eos:
                 self.connected.getPort()
                 # Init Connection
                 self.connected.initUI()
+                self.initConnectedStatus()
             except:
                 tkinter.messagebox.showwarning("Opening Port","Unavailable to connect to the port")
                 print("Error! " + str(self.connected))
-            self.initConnectedStatus()
+                self.connected = None
         else:
             self.myParent.after(100,self.checkConnectQueue)
             
@@ -252,7 +255,11 @@ class eos:
             try:
                 if self.runningExpFrame.winfo_exists():
                     if not self.queue.empty():
-                        header = self.queue.get()
+                        header = ''
+                        try:
+                            header = self.queue.get()
+                        except:
+                            pass
                         if header == b'0':
                             # temp update
                             temp = ''
@@ -272,7 +279,6 @@ class eos:
                             print (resistance)
                             t = threading.Thread(target=self.saveTable,args=[self.runningTimeL["text"].split(" ")[2],self.currentTempL["text"].split(" ")[1],resistance])
                             t.start()
-#                             self.runningTable.insert("", "end", "", values=((self.runningTimeL["text"].split(" ")[2],self.currentTempL["text"].split(" ")[1], resistance)), tag = 1)
             except:
                 print ("Exp frame not running")
             
@@ -302,14 +308,14 @@ class eos:
             
             testingStep = (maxTemp-minTemp)/intervals
             if isinstance(testingStep, int):
-                percentage = current/(intervals * 2 * testingStep -1) * 100
+                percentage = current/(testingStep * 2 + 1) * 100
             else:
                 percentage = current/(intervals * 2 * floor(testingStep) -1) *100
             
             self.percentageL["text"] = "Percentage: " + "{0:.2f}".format(percentage) + "%"
         else:
             size = len(currentExp["setPoints"])
-            percentage = current/size * 100
+            percentage = current/(size*2-1) * 100
             self.percentageL["text"] = "Percentage: " + "{0:.2f}".format(percentage) + "%"
         
         if os.path.exists(".\Experiments\\"+ currentExp["name"] +".dat"):
@@ -323,6 +329,19 @@ class eos:
         expElements["results"].append(newSetpoint)
         json.dump(expElements,file)
         file.close()
+        if int(percentage) == 100:
+            print("Finished!")
+            # init time
+            self.time = 0
+            # Cancel tick callback
+            root.after_cancel(self.tickID)
+            # cancle queue
+            root.after_cancel(self.bufferID)
+            # Stop updater from seeing queue
+#             self.connected.stopUpdater()
+#             self.initExperimentFrameView(currentExp["name"])
+            currentExp = None
+            self.backHomeRunning()
     
     """ Create new Experiment Popup"""
     def initCreateExpPopup(self):
@@ -348,6 +367,11 @@ class eos:
         else:
             self.initCustomInterval()
         
+        self.timeL = Label(self.createPopup, text = "Time (min)", bg = self.background, font = self.generalfont)
+        self.timeL.grid(row=5, column=0, padx=self.paddingPopup, pady=self.paddingPopup, sticky = E)
+        self.timeE = Spinbox(self.createPopup, font = self.generalfont, from_=1, to=10, width = 18)
+        self.timeE.grid(row=5, column=1, padx=self.paddingPopup, pady=self.paddingPopup, sticky = W)
+        
         # Init radio variable and set the radio to the selected option
         self.experimentType = IntVar()
         self.experimentType.set(self.oldRadio)
@@ -372,24 +396,19 @@ class eos:
     def initStep(self):
         self.minTemL = Label(self.createPopup, text = "Min Temperature", bg = self.background, font = self.generalfont)
         self.minTemL.grid(row=2, column=0, padx=self.paddingPopup, pady=self.paddingPopup, sticky = E)
-        self.minTemE = Spinbox(self.createPopup, font = self.generalfont, from_=21, to=120, width = 18)
+        self.minTemE = Spinbox(self.createPopup, font = self.generalfont, from_=20, to=120, width = 18)
         self.minTemE.grid(row=2, column=1, padx=self.paddingPopup, pady=self.paddingPopup, sticky = W)
         
         # Label and entry boxes
         self.maxTemL = Label(self.createPopup, text = "Max Temperature", bg = self.background, font = self.generalfont)
         self.maxTemL.grid(row=3, column=0, padx=self.paddingPopup, pady=self.paddingPopup, sticky = E)
-        self.maxTemE = Spinbox(self.createPopup, font = self.generalfont, from_=28, to=120, width = 18)
+        self.maxTemE = Spinbox(self.createPopup, font = self.generalfont, from_=21, to=120, width = 18)
         self.maxTemE.grid(row=3, column=1, padx=self.paddingPopup, pady=self.paddingPopup, sticky = W)
         
         self.intervalL = Label(self.createPopup, text = "Interval", bg = self.background, font = self.generalfont)
         self.intervalL.grid(row=4, column=0, padx=self.paddingPopup, pady=self.paddingPopup, sticky = E)
-        self.intervalE = Spinbox(self.createPopup, font = self.generalfont, from_=1, to=256, width = 18)
+        self.intervalE = Spinbox(self.createPopup, font = self.generalfont, from_=1, to=255, width = 18)
         self.intervalE.grid(row=4, column=1, padx=self.paddingPopup, pady=self.paddingPopup, sticky = W)
-        
-        self.timeL = Label(self.createPopup, text = "Time (min)", bg = self.background, font = self.generalfont)
-        self.timeL.grid(row=5, column=0, padx=self.paddingPopup, pady=self.paddingPopup, sticky = E)
-        self.timeE = Spinbox(self.createPopup, font = self.generalfont, from_=1, to=10, width = 18)
-        self.timeE.grid(row=5, column=1, padx=self.paddingPopup, pady=self.paddingPopup, sticky = W)
 
     """ Init custom interval form"""        
     def initCustomInterval(self):
@@ -416,7 +435,7 @@ class eos:
         # Button and entry for new temp
         self.addT = Label(self.listPopupFrame, text = "Add Temperature", bg = self.background, font = self.generalfont)
         self.addT.grid(row=1, column=0,padx = self.paddingPopup)
-        self.addE = Spinbox(self.listPopupFrame, font = self.generalfont, from_=27, to=120, width = 8)
+        self.addE = Spinbox(self.listPopupFrame, font = self.generalfont, from_=20, to=120, width = 8)
         self.addE.grid(row=1,column=1)
         self.addE.bind('<Return>', self.addTemp)
         
@@ -433,8 +452,8 @@ class eos:
         self.deleteTempButton = Button(self.buttonListFrame, text = "Delete",fg = "black",bg="#F3A262", font = self.generalfont, command = self.deleteTemp)
         self.deleteTempButton.grid(row = 0, column = 1, pady = self.paddingPopup)
 
-        self.fileTempButton = Button(self.buttonListFrame, text = "File",fg = "black",bg="#F3A262", font = self.generalfont)
-        self.fileTempButton.grid(row = 0, column = 2, pady = self.paddingPopup)
+#         self.fileTempButton = Button(self.buttonListFrame, text = "File",fg = "black",bg="#F3A262", font = self.generalfont)
+#         self.fileTempButton.grid(row = 0, column = 2, pady = self.paddingPopup)
         
     """ Add a temp to the list of custom interval"""        
     def addTemp(self,event):
@@ -505,10 +524,11 @@ class eos:
         else:
             # its a custom interval experiment
             # Get the list of temps from the interval List
-            temps = self.intervalList.get(0, END)
+            temp_list = list(self.intervalList.get(0, END))
+            temp_list.sort(key=str.lower)
             currentExp = { "name": self.nameE.get(),
                     "type": self.oldRadio,
-                    "setPoints": temps,
+                    "setPoints": temp_list,
                     "time": self.timeE.get(),
                     "current": 0}
             # Creating file 'expName'.info to write the description of the experiment
@@ -546,7 +566,6 @@ class eos:
     """ Initialize running Exp View"""
     def initRunningExpView(self):
         global currentExp
-        
         # Destroy current View
         if self.homeFrame.winfo_exists():
             # If the home frame is running
@@ -636,17 +655,20 @@ class eos:
         try:
             json_data = open( filename, "r" )
         except:
-            tkinter.messagebox.showwarning("Open file","Cannot open this file\n(%s)" % filename)
+            tkinter.messagebox.showwarning("Opening info file","Cannot open this file\n(%s)" % filename)
             return
             
         self.info = json.load(json_data)
+        json_data.close()
         
         filename =  os.path.join(os.getcwd()+"\Experiments", value + ".dat")
         
         try:
             json_data = open(filename , "r")
         except:
-            tkinter.messagebox.showwarning("Open file","Cannot open this file\n(%s)" % filename)
+            tkinter.messagebox.showwarning("Open dat file","Cannot open this file\n(%s)" % filename)
+            self.listBox.delete(self.listBox.curselection()[0])
+            os.remove(os.path.join(os.getcwd()+"\Experiments", value + ".info"))
             return
         
         # Get the result file of the experiment
@@ -713,7 +735,7 @@ class eos:
         self.expTable.tag_configure(0,font = self.generalfont)
         
         # Export and back buttons
-        self.exportB = Button(group, text = "Export",fg = "black",bg="#F3A262", pady = self.buttonPady, font = self.generalExpfont)
+        self.exportB = Button(group, text = "Export",fg = "black",bg="#F3A262", pady = self.buttonPady, font = self.generalExpfont, command = lambda: self.export(results["results"]))
         self.exportB.grid(row=3,column=0, pady = self.paddingGeneralExp, sticky = E+W)
         
         self.backB = Button(group, text = "Back",fg = "black",bg="#F3A262", pady = self.buttonPady, font = self.generalExpfont, command = self.backHomeFinished)
@@ -781,12 +803,13 @@ class eos:
             self.time = 0
             # Cancel tick callback
             root.after_cancel(self.tickID)
+            # cancle queue
             root.after_cancel(self.bufferID)
             # delete 
             try:
                 # Check if theres a dat file
                 open(os.path.join(os.getcwd()+"\Experiments", currentExp["name"] + ".dat"))
-                # theres a dat, remove green thingy
+                # theres a dat keep the experiment, just remove green thingy
                 for i,item in enumerate(self.listBox.get(0, END)):
                     if currentExp["name"] == item:
                         self.listBox.itemconfig(i, bg = "white")
@@ -803,17 +826,45 @@ class eos:
             currentExp = None
             self.backHomeRunning()
             self.connected.sendByte(self.connected.ABORT)
+            
+    def export(self, results):
+        filename = ''
+        try:
+            options = {}
+            options['defaultextension'] = '.csv'
+            filename = tkinter.filedialog.asksaveasfilename(**options)
+            if filename == '':
+                return
+            file = open(filename,"w+")
+            writer = csv.writer(file)
+        except:
+            tkinter.messagebox.showwarning("Export","Could not save file " + filename)
+        writer.writerow( ('Time', 'Temperature', 'Resistance') )
+        for item in results:
+            writer.writerow( (item["time"], item["temp"],item["resistance"]) )
+        file.close()
     
     def stepChecker(self):
         if re.match(r'^[\w\d_()]*',self.nameE.get()):
             print ('yes')
         else: 
             print ('false')
+    
+    def closingWindow(self):
+        global currentExp
+        if currentExp is not None:
+            if tkinter.messagebox.askyesno("Closing", "A current experiment is running\n Do you wish to cancel it?"):
+                pass
+        elif self.connected is not None:
+            self.connected.closePort()
+            self.myParent.destroy()
+        else:
+            self.myParent.destroy()
         
+    
 if __name__ == "__main__":
     currentExp = None
     root = Tk()
     root.title("EOS Measuring System")
     eos(root)
     root.mainloop()
-    

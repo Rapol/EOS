@@ -1,15 +1,20 @@
 import serial,threading,sched,time
+from sched import scheduler
 
 class Connection():
     
     def __init__(self, port1, queue):
-        self.ser = serial.Serial(
+        try:
+            self.ser = serial.Serial(
                     port=port1,
                     baudrate=9600,
                     parity=serial.PARITY_NONE,
                     stopbits=serial.STOPBITS_ONE,
                     bytesize=serial.EIGHTBITS,
-                    timeout=1)
+                    timeout=2)
+        except:
+            print("Error creating Port")
+            return
         self.CONNECTED = b"\x01"
         self.UI = b"\x02"
         self.GUI = b"\x01"
@@ -20,6 +25,9 @@ class Connection():
         self.RUN = b"\x05"
         
         self.queue = queue
+        
+        self.scheduler = None
+        self.event = None
     
     def sendText(self,text):
         def callback():
@@ -74,6 +82,7 @@ class Connection():
             self.ser.write(bytes( [int(currentExp["intervals"])]))
             self.ser.write(bytes( [ int(currentExp["time"]) ]))
             self.ser.write(self.RUN)
+        self.ser.flushInput()
         t = threading.Thread(target=callback)
         t.start()
 
@@ -88,20 +97,9 @@ class Connection():
                 self.ser.write(bytes( [ int(setpoint)] ))
             self.ser.write(bytes( [ int( currentExp["time"] )] ))
             self.ser.write(self.RUN)
+        self.ser.flushInput()
         t = threading.Thread(target=callback)
         t.start()
-    
-#     def updater(self):
-#         def callback():
-#             print("hi")
-#             if self.ser.inWaiting() > 0:
-#                 a = self.ser.read()
-#                 self.queue.put(a)
-#             s = sched.scheduler(time.time,time.sleep)
-#             s.enter(.2, 1, callback)
-#             s.run()
-#         t = threading.Thread(target=callback)
-#         t.start()
         
     def updater(self):
         def callback(scheduler=None):
@@ -115,3 +113,9 @@ class Connection():
                 self.queue.put(a)
         t = threading.Thread(target=callback)
         t.start()
+        
+#     def stopUpdater(self):
+#         try:
+#             self.scheduler.cancel(self.event)
+#         except:
+#             print("No event found in queue")
