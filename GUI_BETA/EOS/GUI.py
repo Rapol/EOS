@@ -3,7 +3,7 @@ from tkinter.ttk import Treeview
 from tkinter.constants import DISABLED
 from EOS.connect import Connection
 import json,os,glob,threading,queue,datetime, tkinter.messagebox, serial.tools.list_ports, re
-from time import sleep
+from math import floor
 
 class eos:
     
@@ -195,7 +195,7 @@ class eos:
             port = self.portDropS.get()
             print (port)
             try:
-                self.connected = Connection(port)
+                self.connected = Connection(port, self.queue)
                 self.queue.put(self.connected)
             except:
                 tkinter.messagebox.showwarning("Opening Port","Unavailable to connect to the port")
@@ -248,30 +248,82 @@ class eos:
             
     def checkBufferQueue(self):
         def callback():
-            if not self.queue.empty():
-                header = self.queue.get()
-                if header == b'0':
-                    # temp update
-                    temp = ''
-                    nextChar = self.queue.get()
-                    while(nextChar != b'\n'):
-                        temp += nextChar.decode()
-                        nextChar = self.queue.get()
-                    print (temp)
-                    self.currentTempL['text'] = 'Temperature: ' + temp
-                elif header == b'1':
-                    # resistance update
-                    resistance = ''
-                    nextChar = self.queue.get()
-                    while(nextChar != b'\n'):
-                        resistance += nextChar.decode()
-                        nextChar = self.queue.get()
-                    print (resistance)
-                    self.runningTable.insert("", "end", "", values=((self.timeL.cget("text"),self.currentTempL.cget("text"), resistance)), tag = 1)
-            self.bufferID = self.myParent.after(500,callback)
+            global currentExp
+            try:
+                if self.runningExpFrame.winfo_exists():
+                    if not self.queue.empty():
+                        header = self.queue.get()
+                        if header == b'0':
+                            # temp update
+                            temp = ''
+                            nextChar = self.queue.get()
+                            while(nextChar != b'\n'):
+                                temp += nextChar.decode()
+                                nextChar = self.queue.get()
+                            print (temp)
+                            self.currentTempL['text'] = 'Temperature: ' + temp
+                        elif header == b'1':
+                            # resistance update
+                            resistance = ''
+                            nextChar = self.queue.get()
+                            while(nextChar != b'\n'):
+                                resistance += nextChar.decode()
+                                nextChar = self.queue.get()
+                            print (resistance)
+                            t = threading.Thread(target=self.saveTable,args=[self.runningTimeL["text"].split(" ")[2],self.currentTempL["text"].split(" ")[1],resistance])
+                            t.start()
+#                             self.runningTable.insert("", "end", "", values=((self.runningTimeL["text"].split(" ")[2],self.currentTempL["text"].split(" ")[1], resistance)), tag = 1)
+            except:
+                print ("Exp frame not running")
+            
+            self.bufferID = self.myParent.after(1000,callback)
         t = threading.Thread(target=callback)
         t.start()
             
+    def saveTable(self,time,temp,resistance):
+        global currentExp
+        newSetpoint = {"temp": temp,
+                       "time": time,
+                       "resistance": resistance
+                       }
+        if currentExp["current"] % 2 == 0:
+            self.runningTable.insert("", "end", "", values=((time,temp,resistance)), tag = 1)
+        else:
+            self.runningTable.insert("", "end", "", values=((time,temp,resistance)), tag = 0)
+            
+        currentExp["current"] = currentExp["current"] + 1
+        current = int(currentExp["current"])
+        
+        if currentExp["type"] == 1:
+            #its a step experiment
+            maxTemp = int(currentExp["maxTemp"])
+            minTemp = int(currentExp["minTemp"])
+            intervals = int(currentExp["intervals"])
+            
+            testingStep = (maxTemp-minTemp)/intervals
+            if isinstance(testingStep, int):
+                percentage = current/(intervals * 2 * testingStep -1) * 100
+            else:
+                percentage = current/(intervals * 2 * floor(testingStep) -1) *100
+            
+            self.percentageL["text"] = "Percentage: " + "{0:.2f}".format(percentage) + "%"
+        else:
+            size = len(currentExp["setPoints"])
+            percentage = current/size * 100
+            self.percentageL["text"] = "Percentage: " + "{0:.2f}".format(percentage) + "%"
+        
+        if os.path.exists(".\Experiments\\"+ currentExp["name"] +".dat"):
+            file =open(".\Experiments\\"+ currentExp["name"] +".dat",'r')
+            expElements = json.load(file)
+            file.close()
+            file=open(".\Experiments\\"+ currentExp["name"] +".dat",'w+')
+        else:
+            file=open(".\Experiments\\"+ currentExp["name"] +".dat",'w+')
+            expElements  = { "results": []}
+        expElements["results"].append(newSetpoint)
+        json.dump(expElements,file)
+        file.close()
+    
     """ Create new Experiment Popup"""
     def initCreateExpPopup(self):
         # Creating a top level window
@@ -318,16 +370,16 @@ class eos:
     
     """ Init step form """
     def initStep(self):
+        self.minTemL = Label(self.createPopup, text = "Min Temperature", bg = self.background, font = self.generalfont)
+        self.minTemL.grid(row=2, column=0, padx=self.paddingPopup, pady=self.paddingPopup, sticky = E)
+        self.minTemE = Spinbox(self.createPopup, font = self.generalfont, from_=21, to=120, width = 18)
+        self.minTemE.grid(row=2, column=1, padx=self.paddingPopup, pady=self.paddingPopup, sticky = W)
+        
         # Label and entry boxes
         self.maxTemL = Label(self.createPopup, text = "Max Temperature", bg = self.background, font = self.generalfont)
-        self.maxTemL.grid(row=2, column=0, padx=self.paddingPopup, pady=self.paddingPopup, sticky = E)
+        self.maxTemL.grid(row=3, column=0, padx=self.paddingPopup, pady=self.paddingPopup, sticky = E)
         self.maxTemE = Spinbox(self.createPopup, font = self.generalfont, from_=28, to=120, width = 18)
-        self.maxTemE.grid(row=2, column=1, padx=self.paddingPopup, pady=self.paddingPopup, sticky = W)
-        
-        self.minTemL = Label(self.createPopup, text = "Min Temperature", bg = self.background, font = self.generalfont)
-        self.minTemL.grid(row=3, column=0, padx=self.paddingPopup, pady=self.paddingPopup, sticky = E)
-        self.minTemE = Spinbox(self.createPopup, font = self.generalfont, from_=21, to=120, width = 18)
-        self.minTemE.grid(row=3, column=1, padx=self.paddingPopup, pady=self.paddingPopup, sticky = W)
+        self.maxTemE.grid(row=3, column=1, padx=self.paddingPopup, pady=self.paddingPopup, sticky = W)
         
         self.intervalL = Label(self.createPopup, text = "Interval", bg = self.background, font = self.generalfont)
         self.intervalL.grid(row=4, column=0, padx=self.paddingPopup, pady=self.paddingPopup, sticky = E)
@@ -440,30 +492,32 @@ class eos:
                     "maxTemp": self.maxTemE.get(),
                     "minTemp": self.minTemE.get(),
                     "intervals": self.intervalE.get(),
-                    "time": self.timeE.get()}
+                    "time": self.timeE.get(),
+                    "current": 0}
             # Creating file 'expName'.info to write the description of the experiment
             with open('./Experiments/'+self.nameE.get()+'.info', 'w') as outfile:
                 json.dump(currentExp, outfile)
             # Send Exp commands
             self.connected.initStepExperiment(currentExp)
             # Init updater
-            self.connected.updater(self.queue,self.myParent)
+            self.connected.updater()
             self.checkBufferQueue()
         else:
             # its a custom interval experiment
             # Get the list of temps from the interval List
-            temps = self.intervalList.get(0, self.intervalList.size())
+            temps = self.intervalList.get(0, END)
             currentExp = { "name": self.nameE.get(),
                     "type": self.oldRadio,
                     "setPoints": temps,
-                    "time": self.timeE.get()}
+                    "time": self.timeE.get(),
+                    "current": 0}
             # Creating file 'expName'.info to write the description of the experiment
             with open('./Experiments/'+self.nameE.get()+'.info', 'w') as outfile:
                 json.dump(currentExp, outfile)
             # Send Exp commands
-            self.connected.initExperiment(currentExp)
+            self.connected.initPreSetExperiment(currentExp)
             # Init updater
-            self.connected.updater(self.queue)
+            self.connected.updater()
             self.checkBufferQueue()
                 
         self.createPopup.destroy()
@@ -520,10 +574,10 @@ class eos:
         self.runningTimeL['text'] = 'Elapsed Time: ' + str(datetime.timedelta(seconds=self.time))  
         self.runningTimeL.grid(row=0,column=0, pady = self.paddingGeneralExp, columnspan = 2)
         
-        self.currentTempL = Label(group,text="Temperature: 41C",fg=self.foreground,bg =self.background, font = self.generalExpfont)
+        self.currentTempL = Label(group, text="Temperature: X",fg=self.foreground,bg =self.background, font = self.generalExpfont)
         self.currentTempL.grid(row=1,column=0, pady = self.paddingGeneralExp, columnspan = 2)
         
-        self.percentageL = Label(group,text="Percentage: 75%",fg=self.foreground,bg =self.background, font = self.generalExpfont)
+        self.percentageL = Label(group, text="Percentage: 0.00%", fg=self.foreground,bg =self.background, font = self.generalExpfont)
         self.percentageL.grid(row=2,column=0, pady = self.paddingGeneralExp, columnspan = 2)
         
         self.runningTableFrame = Frame(group, relief=RIDGE, bg = self.background)
@@ -546,14 +600,17 @@ class eos:
         self.runningTable.configure(yscrollcommand=self.runningTreeScroll.set)
         self.runningTreeScroll.config(command=self.runningTable)
         
-#         self.runningTable.insert("", "end", "", values=(("1:20","33C", "75K")), tag = 1)
-#         self.runningTable.insert("", "end", "", values=(("1:34","44C", "67K")), tag = 0)
-#         self.runningTable.insert("", "end", "", values=(("2:04","47C", "55K")), tag = 1)
-#         self.runningTable.insert("", "end", "", values=(("2:32","52C", "45K")), tag = 0)
-#         self.runningTable.insert("", "end", "", values=(("2:57","66C", "48K")), tag = 1)
-#         self.runningTable.insert("", "end", "", values=(("3:33","52C", "50K")), tag = 0)
-#         self.runningTable.insert("", "end", "", values=(("3:43","47C", "53K")), tag = 1)
-#         self.runningTable.insert("", "end", "", values=(("3:56","44C", "57K")), tag = 0)
+        if currentExp["current"] >= 1:
+            # Load file
+            json_data=open('./Experiments/'+currentExp["name"]+'.dat', 'w')
+            # Get json data
+            expElement = json.load(json_data)
+            for i,item in enumerate(expElement["results"]):
+                if i % 2 == 0:
+                    self.runningTable.insert("", "end", "", values=((item["time"],item["temp"],item["resistance"])), tag = 1)
+                else:
+                    self.runningTable.insert("", "end", "", values=((item["time"],item["temp"],item["resistance"])), tag = 0)
+        
         self.runningTable.tag_configure(1, background = "#EFEFEF",font = self.generalfont)
         self.runningTable.tag_configure(0,font = self.generalfont)
         
@@ -729,6 +786,11 @@ class eos:
             try:
                 # Check if theres a dat file
                 open(os.path.join(os.getcwd()+"\Experiments", currentExp["name"] + ".dat"))
+                # theres a dat, remove green thingy
+                for i,item in enumerate(self.listBox.get(0, END)):
+                    if currentExp["name"] == item:
+                        self.listBox.itemconfig(i, bg = "white")
+                        break
             except:
                 # if not delete the experiment for good
                 os.remove(os.path.join(os.getcwd()+"\Experiments", currentExp["name"] + ".info"))

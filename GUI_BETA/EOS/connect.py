@@ -1,9 +1,8 @@
-import serial,threading
-from time import sleep
+import serial,threading,sched,time
 
 class Connection():
     
-    def __init__(self, port1):
+    def __init__(self, port1, queue):
         self.ser = serial.Serial(
                     port=port1,
                     baudrate=9600,
@@ -19,16 +18,18 @@ class Connection():
         self.PRE_SETPOINT = b"\x01"
         self.ABORT = b"\x04"
         self.RUN = b"\x05"
+        
+        self.queue = queue
     
-    def sendText(self,text,queue):
+    def sendText(self,text):
         def callback():
             # send the character to the device
             self.ser.write(text.encode())
             out = ''
-            sleep(.3)
+            time.sleep(.3)
             while self.ser.inWaiting() > 0:
                 out += self.ser.read().decode()
-            queue.put(out)
+            self.queue.put(out)
         t = threading.Thread(target=callback)
         t.start()
         
@@ -38,15 +39,15 @@ class Connection():
         t = threading.Thread(target=callback)
         t.start()
     
-    def sendByteTwoWay(self,byte,queue):
+    def sendByteTwoWay(self,byte):
         def callback():
             # send the character to the device
             self.ser.write(byte)
-            sleep(.3)
+            time.sleep(.3)
             out = None
             while self.ser.inWaiting() > 0:
                 out = self.ser.read()
-            queue.put(out)
+            self.queue.put(out)
         t = threading.Thread(target=callback)
         t.start()
         
@@ -81,21 +82,36 @@ class Connection():
             self.ser.write(self.EX_SETUP)
             self.ser.write(self.PRE_SETPOINT)
             setpoints = currentExp["setPoints"]
-            self.ser.write(len(setpoints))
+            print(len(setpoints))
+            self.ser.write(bytes( [ int(len(setpoints))] ))
             for setpoint in setpoints:
-                self.ser.write(setpoint)
-            self.ser.write(currentExp[""].encode())
-            self.ser.write(currentExp["time"].encode())
+                self.ser.write(bytes( [ int(setpoint)] ))
+            self.ser.write(bytes( [ int( currentExp["time"] )] ))
+            self.ser.write(self.RUN)
         t = threading.Thread(target=callback)
         t.start()
     
-    def updater(self, queue,parent):
-        def callback():
+#     def updater(self):
+#         def callback():
+#             print("hi")
+#             if self.ser.inWaiting() > 0:
+#                 a = self.ser.read()
+#                 self.queue.put(a)
+#             s = sched.scheduler(time.time,time.sleep)
+#             s.enter(.2, 1, callback)
+#             s.run()
+#         t = threading.Thread(target=callback)
+#         t.start()
+        
+    def updater(self):
+        def callback(scheduler=None):
+            if scheduler is None:
+                scheduler = sched.scheduler(time.time, time.sleep)
+                scheduler.enter(0,1,callback,([scheduler]))
+                scheduler.run()
+            scheduler.enter(.1,1,callback,([scheduler]))
             if self.ser.inWaiting() > 0:
-                queue.put(self.ser.read())
-            parent.after(200,callback)
-            #sleep(.1)
-            #callback()
+                a = self.ser.read()
+                self.queue.put(a)
         t = threading.Thread(target=callback)
         t.start()
-    
