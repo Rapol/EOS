@@ -15,6 +15,6 @@
 
 extern void PWM_Init(void);
 extern void PWM_SetPulse(uint32_t ui32PWMOut, int step);
-extern void PWM_SetFanVelocity(float currentTemp, float setpointTemp, uint32_t ui32PWMOut);
+extern void PWM_SetFanVelocity(float currentTemp, float setpointTemp, float totalDiff);
 
 #endif /* PWM_H_ */

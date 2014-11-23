@@ -39,11 +39,6 @@ void UART_Init(void) {
 	// Enable UART1
 	SysCtlPeripheralEnable(SYSCTL_PERIPH_UART1);
 
-	// Enable Interrupts for UART1
-//	IntMasterEnable();
-//	IntEnable(INT_UART1);
-//	UARTIntEnable(UART1_BASE, UART_INT_RX | UART_INT_RT);
-
 	// Configure GPIO pins for UART0
 	GPIOPinConfigure(GPIO_PA0_U0RX);
 	GPIOPinConfigure(GPIO_PA1_U0TX);

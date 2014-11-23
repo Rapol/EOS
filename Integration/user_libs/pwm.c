@@ -76,37 +76,7 @@ void PWM_SetPulse(uint32_t ui32PWMOut, int step) {
 	PWMPulseWidthSet(PWM0_BASE, ui32PWMOut, step*2);
 }
 
-void PWM_SetFanVelocity(float currentTemp, float setpointTemp, uint32_t ui32PWMOut) {
-	float tempDiff = currentTemp - setpointTemp;
-
-	if (tempDiff < 4) {
-		PWM_SetPulse(ui32PWMOut, 1);
-	}
-	else if ((tempDiff >= 4) && (tempDiff <= 7)) {
-		PWM_SetPulse(ui32PWMOut, 391);
-	}
-	else if ((tempDiff >= 8) && (tempDiff <= 11)) {
-		PWM_SetPulse(ui32PWMOut, 521);
-	}
-	else if ((tempDiff >= 12) && (tempDiff <= 15)) {
-		PWM_SetPulse(ui32PWMOut, 651);
-	}
-	else if ((tempDiff >= 16) && (tempDiff <= 19)) {
-		PWM_SetPulse(ui32PWMOut, 781);
-	}
-	else if ((tempDiff >= 20) && (tempDiff <= 23)) {
-		PWM_SetPulse(ui32PWMOut, 912);
-	}
-	else if ((tempDiff >= 24) && (tempDiff <= 27)) {
-		PWM_SetPulse(ui32PWMOut, 1042);
-	}
-	else if ((tempDiff >= 28) && (tempDiff <= 32)) {
-		PWM_SetPulse(ui32PWMOut, 1172);
-	}
-	else if ((tempDiff >= 33) && (tempDiff <= 35)) {
-		PWM_SetPulse(ui32PWMOut, 1302);
-	}
-	else {
-		PWM_SetPulse(ui32PWMOut, 1561);
-	}
+void PWM_SetFanVelocity(float currentTemp, float setpointTemp, float totalDiff) {
+	float tempDiff = setpointTemp - currentTemp;
+	PWM_SetPulse(PWM_OUT_4, (1561 * tempDiff / totalDiff));
 }
