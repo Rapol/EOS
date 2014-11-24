@@ -1,0 +1,72 @@
+Traceback (most recent call last):
+  File "GUI.py", line 896, in <module>
+  File "GUI.py", line 59, in __init__
+  File "GUI.py", line 98, in initHomeView
+  File "c:\Python33\lib\tkinter\__init__.py", line 3425, in __init__
+    Image.__init__(self, 'photo', name, cnf, master, **kw)
+  File "c:\Python33\lib\tkinter\__init__.py", line 3381, in __init__
+    self.tk.call(('image', 'create', imgtype, name,) + options)
+_tkinter.TclError: couldn't open "../eos.gif": no such file or directory
+Exception in Tkinter callback
+Traceback (most recent call last):
+  File "c:\Python33\lib\tkinter\__init__.py", line 1489, in __call__
+    return self.func(*args)
+  File "GUI.py", line 770, in viewExperiment
+IndexError: tuple index out of range
+Exception in thread Thread-9:
+Traceback (most recent call last):
+  File "c:\Python33\lib\threading.py", line 901, in _bootstrap_inner
+    self.run()
+  File "c:\Python33\lib\threading.py", line 858, in run
+    self._target(*self._args, **self._kwargs)
+  File "a:\Code\Workspaces\Python\GUI_BETA\EOS\connect.py", line 109, in callback
+    scheduler.run()
+  File "c:\Python33\lib\sched.py", line 152, in run
+    action(*argument, **kwargs)
+  File "a:\Code\Workspaces\Python\GUI_BETA\EOS\connect.py", line 111, in callback
+    if self.ser.inWaiting() > 0:
+  File "c:\Python33\lib\site-packages\serial\serialwin32.py", line 239, in inWaiting
+    raise SerialException('call to ClearCommError failed')
+serial.serialutil.SerialException: call to ClearCommError failed
+
+Exception in thread Thread-4:
+Traceback (most recent call last):
+  File "c:\Python33\lib\threading.py", line 901, in _bootstrap_inner
+    self.run()
+  File "c:\Python33\lib\threading.py", line 858, in run
+    self._target(*self._args, **self._kwargs)
+  File "a:\Code\Workspaces\Python\GUI_BETA\EOS\connect.py", line 109, in callback
+    scheduler.run()
+  File "c:\Python33\lib\sched.py", line 152, in run
+    action(*argument, **kwargs)
+  File "a:\Code\Workspaces\Python\GUI_BETA\EOS\connect.py", line 111, in callback
+    if self.ser.inWaiting() > 0:
+  File "c:\Python33\lib\site-packages\serial\serialwin32.py", line 239, in inWaiting
+    raise SerialException('call to ClearCommError failed')
+serial.serialutil.SerialException: call to ClearCommError failed
+
+Exception in thread Thread-4:
+Traceback (most recent call last):
+  File "c:\Python33\lib\threading.py", line 901, in _bootstrap_inner
+    self.run()
+  File "c:\Python33\lib\threading.py", line 858, in run
+    self._target(*self._args, **self._kwargs)
+  File "a:\Code\Workspaces\Python\GUI_BETA\EOS\connect.py", line 109, in callback
+    scheduler.run()
+  File "c:\Python33\lib\sched.py", line 152, in run
+    action(*argument, **kwargs)
+  File "a:\Code\Workspaces\Python\GUI_BETA\EOS\connect.py", line 111, in callback
+    if self.ser.inWaiting() > 0:
+  File "c:\Python33\lib\site-packages\serial\serialwin32.py", line 239, in inWaiting
+    raise SerialException('call to ClearCommError failed')
+serial.serialutil.SerialException: call to ClearCommError failed
+
+Traceback (most recent call last):
+  File "GUI.py", line 928, in <module>
+  File "GUI.py", line 60, in __init__
+  File "GUI.py", line 99, in initHomeView
+  File "c:\Python33\lib\tkinter\__init__.py", line 3425, in __init__
+    Image.__init__(self, 'photo', name, cnf, master, **kw)
+  File "c:\Python33\lib\tkinter\__init__.py", line 3381, in __init__
+    self.tk.call(('image', 'create', imgtype, name,) + options)
+_tkinter.TclError: couldn't open "eos.gif": no such file or directory
