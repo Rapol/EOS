@@ -1,7 +1,7 @@
 from tkinter import *
 from tkinter.ttk import Treeview
 from tkinter.constants import DISABLED
-from EOS.connect import Connection
+import connect
 import json,os,glob,threading,queue,datetime, tkinter.messagebox, serial.tools.list_ports, re,time,csv
 from math import floor
 from tkinter.filedialog import FileDialog
@@ -197,7 +197,7 @@ class eos:
             port = self.portDropS.get()
             print (port)
             try:
-                self.connected = Connection(port, self.queue)
+                self.connected = connect.Connection(port, self.queue)
                 self.queue.put(self.connected)
             except:
                 tkinter.messagebox.showwarning("Opening Port","Unavailable to connect to the port")
@@ -307,10 +307,10 @@ class eos:
             intervals = int(currentExp["intervals"])
             
             testingStep = (maxTemp-minTemp)/intervals
-            if isinstance(testingStep, int):
+            if testingStep == round(testingStep):
                 percentage = current/(testingStep * 2 + 1) * 100
             else:
-                percentage = current/(intervals * 2 * floor(testingStep) -1) *100
+                percentage = current/(floor(testingStep) * 2 -1) *100
             
             self.percentageL["text"] = "Percentage: " + "{0:.2f}".format(percentage) + "%"
         else:
@@ -337,11 +337,14 @@ class eos:
             root.after_cancel(self.tickID)
             # cancle queue
             root.after_cancel(self.bufferID)
-            # Stop updater from seeing queue
-#             self.connected.stopUpdater()
-#             self.initExperimentFrameView(currentExp["name"])
+            temp = currentExp["name"]
+            for i,item in enumerate(self.listBox.get(0, END)):
+                if currentExp["name"] == item:
+                    self.listBox.itemconfig(i, bg = "white")
+                    break
             currentExp = None
-            self.backHomeRunning()
+            self.myParent.after(100,self.backHomeRunning())
+            
     
     """ Create new Experiment Popup"""
     def initCreateExpPopup(self):
@@ -665,14 +668,13 @@ class eos:
         
         try:
             json_data = open(filename , "r")
+            # Get the result file of the experiment
+            results = json.load(json_data)
         except:
             tkinter.messagebox.showwarning("Open dat file","Cannot open this file\n(%s)" % filename)
             self.listBox.delete(self.listBox.curselection()[0])
             os.remove(os.path.join(os.getcwd()+"\Experiments", value + ".info"))
             return
-        
-        # Get the result file of the experiment
-        results = json.load(json_data)
         
         # Destroy current View
         if self.homeFrame.winfo_exists():
@@ -724,11 +726,11 @@ class eos:
         self.expTable.configure(yscrollcommand=self.expTreeScroll.set)
         
         # Populate table with results
-        for i,value in enumerate(results["results"]):
+        for i,item in enumerate(results["results"]):
             if i % 2 == 0:
-                self.expTable.insert("", "end", "", values=((value["time"],value["temp"], value["resistance"])), tag = 1)
+                self.expTable.insert("", "end", "", values=((item["time"],item["temp"], item["resistance"])), tag = 1)
             else:
-                self.expTable.insert("", "end", "", values=((value["time"],value["temp"], value["resistance"])), tag = 0)
+                self.expTable.insert("", "end", "", values=((item["time"],item["temp"], item["resistance"])), tag = 0)
         
         # Config table 
         self.expTable.tag_configure(1, background = "#EFEFEF",font = self.generalfont)
@@ -740,6 +742,9 @@ class eos:
         
         self.backB = Button(group, text = "Back",fg = "black",bg="#F3A262", pady = self.buttonPady, font = self.generalExpfont, command = self.backHomeFinished)
         self.backB.grid(row=3,column=1, pady = self.paddingGeneralExp, sticky = E+W)
+        
+        self.deleteB = Button(group, text = "Delete",fg = "black",bg="#F3A262", pady = self.buttonPady, font = self.generalExpfont, command = lambda: self.deleteExperiment(value))
+        self.deleteB.grid(row=4,column=0, pady = self.paddingGeneralExp, sticky = E+W,columnspan = 2)
         
         # Column weight
         self.ExpFrame.columnconfigure(0, weight = 1)
@@ -854,13 +859,38 @@ class eos:
         global currentExp
         if currentExp is not None:
             if tkinter.messagebox.askyesno("Closing", "A current experiment is running\n Do you wish to cancel it?"):
-                pass
+                self.connected.sendByte(self.connected.ABORT)
+                self.deleteExperiment(currentExp["name"],False)
+                self.connected.closePort()
+                self.myParent.destroy()
         elif self.connected is not None:
-            self.connected.closePort()
+            try:
+                self.connected.closePort()
+            except:
+                pass
             self.myParent.destroy()
         else:
             self.myParent.destroy()
-        
+
+    def deleteExperiment(self,value,ask = True):
+        # Warn the user if needed
+        if ask:
+            # Clicking delete button
+            if tkinter.messagebox.askyesno("Delete", "Delete experiment?"): 
+                self.listBox.delete(self.listBox.curselection()[0])
+                os.remove(os.path.join(os.getcwd()+"\Experiments", value + ".info"))
+                try:
+                    os.remove(os.path.join(os.getcwd()+"\Experiments", value + ".dat"))
+                except:
+                    print("no .dat file")
+                self.backHomeFinished()
+        else:
+            # Closing Window
+            os.remove(os.path.join(os.getcwd()+"\Experiments", value + ".info"))
+            try:
+                os.remove(os.path.join(os.getcwd()+"\Experiments", value + ".dat"))
+            except:
+                print("no .dat file")
     
 if __name__ == "__main__":
     currentExp = None
